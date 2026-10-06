@@ -7,7 +7,9 @@ module HubKernel
 
       private
 
-      def initialized = { serverInfo: { name: "hub_kernel-mcp", version: HubKernel::Mcp::VERSION }, capabilities: { tools: {} } }
+      def initialized = { protocolVersion: protocol_version, serverInfo: { name: "hub_kernel-mcp", version: HubKernel::Mcp::VERSION }, capabilities: { tools: {} } }
+
+      def protocol_version = params.dig(:params, :protocolVersion)
     end
   end
 end
