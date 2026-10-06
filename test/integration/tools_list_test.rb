@@ -1,0 +1,9 @@
+require "test_helper"
+
+class ToolsListTest < ActionDispatch::IntegrationTest
+  test "a tools/list request returns one tool for each method the caller may call across every served hub" do
+    post "/mcp", params: { jsonrpc: "2.0", id: 1, method: "tools/list" }, headers: { "X-Person" => "sam", "X-Account" => "acme" }, as: :json
+
+    assert_equal %w[shop__price_of shop__restock money__record_spend], response.parsed_body.dig("result", "tools").map { |tool| tool["name"] }
+  end
+end
