@@ -6,4 +6,11 @@ class ToolsListTest < ActionDispatch::IntegrationTest
 
     assert_equal %w[shop__price_of shop__restock money__record_spend], response.parsed_body.dig("result", "tools").map { |tool| tool["name"] }
   end
+
+  test "each listed tool carries an input schema naming the values its method takes" do
+    post "/mcp", params: { jsonrpc: "2.0", id: 1, method: "tools/list" }, headers: { "X-Person" => "sam", "X-Account" => "acme" }, as: :json
+
+    restock = response.parsed_body.dig("result", "tools").find { |tool| tool["name"] == "shop__restock" }
+    assert_equal({ "type" => "object", "properties" => { "item" => {}, "count" => {} } }, restock["inputSchema"])
+  end
 end

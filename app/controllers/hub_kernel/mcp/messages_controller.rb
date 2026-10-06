@@ -24,9 +24,11 @@ module HubKernel
 
       def tools
         HubKernel::Interface.served.flat_map do |served_name, hub|
-          hub.exposures_for(person: caller_person, account: caller_account).map { |exposure| { name: "#{served_name}__#{exposure.name}" } }
+          hub.exposures_for(person: caller_person, account: caller_account).map { |exposure| tool(served_name, exposure) }
         end
       end
+
+      def tool(served_name, exposure) = { name: "#{served_name}__#{exposure.name}", inputSchema: { type: "object", properties: exposure.takes.index_with { {} } } }
 
       def caller_person = send(HubKernel::Mcp.person_method)
 
