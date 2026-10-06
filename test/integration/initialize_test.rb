@@ -12,4 +12,10 @@ class InitializeTest < ActionDispatch::IntegrationTest
 
     assert_equal "2025-03-26", response.parsed_body.dig("result", "protocolVersion")
   end
+
+  test "a client asking for a protocol version the gem does not support gets the newest one it does" do
+    post "/mcp", params: { jsonrpc: "2.0", id: 1, method: "initialize", params: { protocolVersion: "1999-01-01" } }, headers: { "X-Person" => "sam", "X-Account" => "acme" }, as: :json
+
+    assert_equal "2025-11-25", response.parsed_body.dig("result", "protocolVersion")
+  end
 end
