@@ -13,4 +13,10 @@ class ToolsListTest < ActionDispatch::IntegrationTest
     restock = response.parsed_body.dig("result", "tools").find { |tool| tool["name"] == "shop__restock" }
     assert_equal({ "type" => "object", "properties" => { "item" => {}, "count" => {} } }, restock["inputSchema"])
   end
+
+  test "a method the host's permission check refuses for the caller is not listed" do
+    post "/mcp", params: { jsonrpc: "2.0", id: 1, method: "tools/list" }, headers: { "X-Person" => "lee", "X-Account" => "acme" }, as: :json
+
+    assert_equal %w[shop__price_of], response.parsed_body.dig("result", "tools").map { |tool| tool["name"] }
+  end
 end
