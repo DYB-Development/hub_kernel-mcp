@@ -19,4 +19,12 @@ class ToolsListTest < ActionDispatch::IntegrationTest
 
     assert_equal %w[shop__price_of], response.parsed_body.dig("result", "tools").map { |tool| tool["name"] }
   end
+
+  test "a method of a hub that is not on the served list is not listed" do
+    BackOffice.exposures
+
+    post "/mcp", params: { jsonrpc: "2.0", id: 1, method: "tools/list" }, headers: { "X-Person" => "sam", "X-Account" => "acme" }, as: :json
+
+    assert_not_includes response.parsed_body.dig("result", "tools").map { |tool| tool["name"] }, "back_office__close_books"
+  end
 end
