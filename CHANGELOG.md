@@ -2,6 +2,11 @@
 
 ## [Unreleased]
 
+## [0.7.0] - 2026-10-07
+
+### Added
+- hub_kernel-mcp is a the_local provider: installing it gives an app its info, install and develop agents.
+
 ## [0.6.0] - 2026-10-07
 
 ### Added

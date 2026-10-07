@@ -14,3 +14,6 @@ gem "rubocop-rails-omakase", require: false
 
 # Start debugger with binding.b [https://github.com/ruby/debug]
 # gem "debug", ">= 1.0.0"
+
+# Authors and checks the gem's expert agents [https://github.com/tylercschneider/the_local]
+gem "the_local", "~> 0.4.1"
