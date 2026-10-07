@@ -5,6 +5,10 @@ module HubKernel
 
       PROTOCOL_VERSIONS = %w[2025-11-25 2025-06-18 2025-03-26 2024-11-05].freeze
 
+      rescue_from ActionDispatch::Http::Parameters::ParseError do
+        render json: { jsonrpc: "2.0", id: nil, error: { code: -32700, message: "Parse error" } }
+      end
+
       def create
         return head :accepted unless params.key?(:id)
 
