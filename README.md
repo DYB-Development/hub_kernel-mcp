@@ -65,10 +65,13 @@ give, and returns the method's answer as JSON text:
 { "content": [ { "type": "text", "text": "\"soap costs 3\"" } ], "isError": false }
 ```
 
-A hub's refusal, or a value the method requires and the call left out, comes back as a tool
-error carrying the reason, with `isError` set. A tool the caller may not call, a tool that does
-not exist, and a tool naming a hub the host does not serve are all answered with the same
-JSON-RPC error, code -32602, `Unknown tool: <name>`.
+A hub's refusal, a value the method requires and the call left out, a value the method is not
+listed with, and a record the call names that does not exist each come back as a tool error
+carrying the reason, with `isError` set. The last two reasons come from hub_kernel-interface, so
+they read the same in every interface gem, such as `price_of does not take colour` and
+`No item has the id 9`. A tool the caller may not call, a tool that does not exist, and a tool
+naming a hub the host does not serve are all answered with the same JSON-RPC error, code
+-32602, `Unknown tool: <name>`, whatever values the call sends.
 
 A caller the host's sign-in refuses is refused before any hub is asked.
 
