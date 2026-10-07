@@ -33,7 +33,7 @@ module HubKernel
         end
       end
 
-      def tool(served_name, exposure) = { name: "#{served_name}__#{exposure.name}", inputSchema: { type: "object", properties: exposure.takes.index_with { {} } } }
+      def tool(served_name, exposure) = { name: "#{served_name}__#{exposure.name}", description: description(served_name, exposure), inputSchema: { type: "object", properties: exposure.takes.index_with { {} } }, annotations: { readOnlyHint: !exposure.writes } }
 
       def called
         served_name, method_name = tool_name.split("__", 2)
@@ -47,6 +47,8 @@ module HubKernel
       def tool_name = params.dig(:params, :name).to_s
 
       def arguments = params.dig(:params, :arguments)&.to_unsafe_h.to_h.deep_symbolize_keys
+
+      def description(served_name, exposure) = exposure.writes ? "Changes data in the #{served_name} hub." : "Reads data from the #{served_name} hub."
 
       def caller_person = send(HubKernel::Mcp.person_method)
 
