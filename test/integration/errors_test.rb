@@ -51,4 +51,10 @@ class ErrorsTest < ActionDispatch::IntegrationTest
 
     assert_equal({ "jsonrpc" => "2.0", "id" => 6, "error" => { "code" => -32603, "message" => "Internal error" } }, response.parsed_body)
   end
+
+  test "an unexpected error inside a hub method is reported to the host app's error reporting" do
+    assert_error_reported(RuntimeError) do
+      post "/mcp", params: { jsonrpc: "2.0", id: 7, method: "tools/call", params: { name: "boiler__heat" } }, headers: { "X-Person" => "sam", "X-Account" => "acme" }, as: :json
+    end
+  end
 end
