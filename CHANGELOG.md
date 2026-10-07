@@ -2,6 +2,11 @@
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-10-06
+
+### Added
+- Each listed tool says whether it only reads or changes data, as a `readOnlyHint` annotation and in a description naming its hub.
+
 ## [0.2.0] - 2026-10-06
 
 ### Added

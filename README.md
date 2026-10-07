@@ -40,8 +40,16 @@ Each tool is named `<hub>__<method>`, where the hub part is the name the hub is 
 its input schema names the values the method takes:
 
 ```json
-{ "name": "supplies__price_of", "inputSchema": { "type": "object", "properties": { "item": {} } } }
+{
+  "name": "supplies__price_of",
+  "description": "Reads data from the supplies hub.",
+  "inputSchema": { "type": "object", "properties": { "item": {} } },
+  "annotations": { "readOnlyHint": true }
+}
 ```
+
+A tool for a method that writes has `readOnlyHint` set to false and a description saying it
+changes data, so a client can ask before it calls one.
 
 `tools/call` runs the hub method a tool names, for the person and account the host's methods
 give, and returns the method's answer as JSON text:
