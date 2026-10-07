@@ -2,6 +2,14 @@
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-10-07
+
+### Added
+- `HubKernel::Mcp.check!`, which raises `HubKernel::Mcp::UnservableHubError` naming each problem hub_kernel-interface's check finds, a served name holding two underscores in a row, and a tool name MCP does not allow.
+
+### Changed
+- hub_kernel-mcp requires hub_kernel-interface 0.6.
+
 ## [0.3.0] - 2026-10-06
 
 ### Added

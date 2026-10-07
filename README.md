@@ -21,8 +21,15 @@ serves:
 ```ruby
 Rails.application.config.to_prepare do
   HubKernel::Interface.hubs = [ Supplies, { "money" => Billing::Ledger } ]
+  HubKernel::Mcp.check!
 end
 ```
+
+`HubKernel::Mcp.check!` raises `HubKernel::Mcp::UnservableHubError` naming every problem
+in one error. It names each problem hub_kernel-interface's own check finds in the served
+list, a served name holding two underscores in a row, and a tool whose name holds a
+character other than a letter, a digit, an underscore or a hyphen or is longer than 64
+characters. Inside `to_prepare` it runs again after every code reload.
 
 Mount the engine:
 
