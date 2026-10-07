@@ -9,7 +9,7 @@ module HubKernel
         return head :accepted unless params.key?(:id)
 
         render json: { jsonrpc: "2.0", id: params[:id], result: answer }
-      rescue UnknownTool, HubKernel::UnexposedMethodError
+      rescue UnknownTool, HubKernel::UnexposedMethodError, HubKernel::NotAllowed
         render json: { jsonrpc: "2.0", id: params[:id], error: { code: -32602, message: "Unknown tool: #{tool_name}" } }
       end
 

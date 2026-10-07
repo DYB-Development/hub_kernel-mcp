@@ -24,4 +24,10 @@ class ToolsCallTest < ActionDispatch::IntegrationTest
 
     assert_equal "Unknown tool: back_office__close_books", response.parsed_body.dig("error", "message")
   end
+
+  test "a tool the caller may not call is answered the same way as a tool that does not exist" do
+    post "/mcp", params: { jsonrpc: "2.0", id: 1, method: "tools/call", params: { name: "shop__restock", arguments: { item: "soap", count: 4 } } }, headers: { "X-Person" => "lee", "X-Account" => "acme" }, as: :json
+
+    assert_equal({ "code" => -32602, "message" => "Unknown tool: shop__restock" }, response.parsed_body["error"])
+  end
 end
