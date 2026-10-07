@@ -39,4 +39,12 @@ class McpCheckTest < ActiveSupport::TestCase
 
     assert_equal "The tool #{"m" * 51}__record_spend is longer than 64 characters", error.message
   end
+
+  test "every problem is named in one error" do
+    HubKernel::Interface.hubs = [ Silent, { "money box" => Ledger } ]
+
+    error = assert_raises(HubKernel::Mcp::UnservableHubError) { HubKernel::Mcp.check! }
+
+    assert_equal [ "McpCheckTest::Silent exposes no methods to serve", "The tool money box__record_spend holds a character other than a letter, a digit, an underscore or a hyphen" ], error.message.lines(chomp: true)
+  end
 end
