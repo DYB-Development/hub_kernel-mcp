@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-10-07
+
+### Changed
+- A permitted call sending a value its method is not listed with comes back as a tool error naming the value, where the value used to be dropped.
+- A call naming a record that does not exist comes back as a tool error naming the kind of record and the id.
+
 ## [0.4.0] - 2026-10-07
 
 ### Added
