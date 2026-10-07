@@ -1,6 +1,21 @@
 require "test_helper"
 
 class ErrorsTest < ActionDispatch::IntegrationTest
+  module Boiler
+    extend HubKernel::Exposes
+
+    exposes :heat, takes: [], writes: true
+
+    def self.heat = raise("the boiler password is hunter2")
+  end
+
+  setup do
+    @hubs = HubKernel::Interface.hubs
+    HubKernel::Interface.hubs = @hubs + [ Boiler ]
+  end
+
+  teardown { HubKernel::Interface.hubs = @hubs }
+
   test "a request body that is not valid JSON is answered with a parse error" do
     post "/mcp", params: "{not json", headers: { "Content-Type" => "application/json", "X-Person" => "sam", "X-Account" => "acme" }
 
@@ -29,5 +44,11 @@ class ErrorsTest < ActionDispatch::IntegrationTest
     get "/mcp", headers: { "X-Person" => "sam", "X-Account" => "acme" }
 
     assert_response :method_not_allowed
+  end
+
+  test "an unexpected error inside a hub method is answered as an internal error without its message" do
+    post "/mcp", params: { jsonrpc: "2.0", id: 6, method: "tools/call", params: { name: "boiler__heat" } }, headers: { "X-Person" => "sam", "X-Account" => "acme" }, as: :json
+
+    assert_equal({ "jsonrpc" => "2.0", "id" => 6, "error" => { "code" => -32603, "message" => "Internal error" } }, response.parsed_body)
   end
 end

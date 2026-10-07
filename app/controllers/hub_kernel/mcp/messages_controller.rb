@@ -17,6 +17,8 @@ module HubKernel
         render_error(-32602, "Unknown tool: #{tool_name}", id: params[:id])
       rescue UnknownMethod
         render_error(-32601, "Method not found: #{params[:method]}", id: params[:id])
+      rescue StandardError
+        render_error(-32603, "Internal error", id: params[:id])
       end
 
       def refuse_get
