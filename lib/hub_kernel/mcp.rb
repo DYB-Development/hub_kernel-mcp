@@ -11,7 +11,7 @@ module HubKernel
     mattr_accessor :account_method
 
     def self.check!
-      problems = shared_problems + doubled_underscores + unlisted_characters
+      problems = shared_problems + doubled_underscores + unlisted_characters + long_names
       raise UnservableHubError, problems.join("\n") if problems.any?
     end
 
@@ -34,12 +34,16 @@ module HubKernel
       end
     end
 
+    def self.long_names
+      tool_names.select { |name| name.length > 64 }.map { |name| "The tool #{name} is longer than 64 characters" }
+    end
+
     def self.tool_names
       HubKernel::Interface.served.select { |_name, hub| hub.respond_to?(:exposures) }.flat_map do |served_name, hub|
         hub.exposures.map { |exposure| "#{served_name}__#{exposure.name}" }
       end
     end
 
-    private_class_method :shared_problems, :doubled_underscores, :unlisted_characters, :tool_names
+    private_class_method :shared_problems, :doubled_underscores, :unlisted_characters, :long_names, :tool_names
   end
 end
