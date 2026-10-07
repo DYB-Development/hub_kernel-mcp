@@ -46,7 +46,7 @@ module HubKernel
 
       def tool_name = params.dig(:params, :name).to_s
 
-      def arguments = params.dig(:params, :arguments).to_unsafe_h.deep_symbolize_keys
+      def arguments = params.dig(:params, :arguments)&.to_unsafe_h.to_h.deep_symbolize_keys
 
       def caller_person = send(HubKernel::Mcp.person_method)
 

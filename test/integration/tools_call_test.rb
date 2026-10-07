@@ -7,6 +7,10 @@ class ToolsCallTest < ActionDispatch::IntegrationTest
     exposes :restock, takes: %i[item], writes: true
 
     def self.restock(item:) = raise(HubKernel::Refused, "The #{item} shelf is full")
+
+    exposes :count_shelves, takes: [], writes: false
+
+    def self.count_shelves = 12
   end
 
   setup do
@@ -56,5 +60,11 @@ class ToolsCallTest < ActionDispatch::IntegrationTest
     post "/mcp", params: { jsonrpc: "2.0", id: 1, method: "tools/call", params: { name: "shop__restock", arguments: { item: "soap" } } }, headers: { "X-Person" => "sam", "X-Account" => "acme" }, as: :json
 
     assert_equal({ "content" => [ { "type" => "text", "text" => "Give count" } ], "isError" => true }, response.parsed_body["result"])
+  end
+
+  test "a tool that takes no values can be called with no arguments" do
+    post "/mcp", params: { jsonrpc: "2.0", id: 1, method: "tools/call", params: { name: "stockroom__count_shelves" } }, headers: { "X-Person" => "sam", "X-Account" => "acme" }, as: :json
+
+    assert_equal "12", response.parsed_body.dig("result", "content", 0, "text")
   end
 end
