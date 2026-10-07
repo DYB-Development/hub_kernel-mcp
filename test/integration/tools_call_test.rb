@@ -67,4 +67,10 @@ class ToolsCallTest < ActionDispatch::IntegrationTest
 
     assert_equal "12", response.parsed_body.dig("result", "content", 0, "text")
   end
+
+  test "a permitted call sending a value its method is not listed with comes back as a tool error naming the value" do
+    post "/mcp", params: { jsonrpc: "2.0", id: 1, method: "tools/call", params: { name: "shop__price_of", arguments: { item: "soap", colour: "red" } } }, headers: { "X-Person" => "sam", "X-Account" => "acme" }, as: :json
+
+    assert_equal({ "content" => [ { "type" => "text", "text" => "price_of does not take colour" } ], "isError" => true }, response.parsed_body["result"])
+  end
 end

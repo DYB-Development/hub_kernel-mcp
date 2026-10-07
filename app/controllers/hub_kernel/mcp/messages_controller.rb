@@ -38,6 +38,8 @@ module HubKernel
       def called
         served_name, method_name = tool_name.split("__", 2)
         hub = HubKernel::Interface.find(served_name) || raise(UnknownTool)
+        raise UnknownTool unless hub.exposed(method_name)
+        HubKernel::Interface::CallReasons.refuse_unlisted_values(hub, method_name, values: arguments, person: caller_person, account: caller_account)
         answer = hub.call_exposed(method_name, values: arguments, person: caller_person, account: caller_account)
         { content: [ { type: "text", text: answer.to_json } ], isError: false }
       rescue HubKernel::Refused, HubKernel::MissingArgumentError => refusal
