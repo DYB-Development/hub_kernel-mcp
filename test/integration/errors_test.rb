@@ -12,4 +12,10 @@ class ErrorsTest < ActionDispatch::IntegrationTest
 
     assert_equal({ "jsonrpc" => "2.0", "id" => nil, "error" => { "code" => -32600, "message" => "Invalid Request" } }, response.parsed_body)
   end
+
+  test "a request naming a method the server does not support is answered with a method-not-found error" do
+    post "/mcp", params: { jsonrpc: "2.0", id: 4, method: "resources/list" }, headers: { "X-Person" => "sam", "X-Account" => "acme" }, as: :json
+
+    assert_equal({ "jsonrpc" => "2.0", "id" => 4, "error" => { "code" => -32601, "message" => "Method not found: resources/list" } }, response.parsed_body)
+  end
 end

@@ -2,6 +2,7 @@ module HubKernel
   module Mcp
     class MessagesController < HubKernel::Mcp.base_controller.constantize
       UnknownTool = Class.new(StandardError)
+      UnknownMethod = Class.new(StandardError)
 
       PROTOCOL_VERSIONS = %w[2025-11-25 2025-06-18 2025-03-26 2024-11-05].freeze
 
@@ -14,6 +15,8 @@ module HubKernel
         render json: { jsonrpc: "2.0", id: params[:id], result: answer }
       rescue UnknownTool, HubKernel::UnexposedMethodError, HubKernel::NotAllowed
         render_error(-32602, "Unknown tool: #{tool_name}", id: params[:id])
+      rescue UnknownMethod
+        render_error(-32601, "Method not found: #{params[:method]}", id: params[:id])
       end
 
       private
@@ -27,6 +30,7 @@ module HubKernel
         when "initialize" then initialized
         when "tools/list" then { tools: tools }
         when "tools/call" then called
+        else raise UnknownMethod
         end
       end
 
