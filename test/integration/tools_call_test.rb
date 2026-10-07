@@ -11,6 +11,10 @@ class ToolsCallTest < ActionDispatch::IntegrationTest
     exposes :count_shelves, takes: [], writes: false
 
     def self.count_shelves = 12
+
+    exposes :shelf_of, takes: %i[item_id], writes: false
+
+    def self.shelf_of(item_id:) = raise(ActiveRecord::RecordNotFound.new("Couldn't find Item", "Item", "id", item_id))
   end
 
   setup do
@@ -78,5 +82,11 @@ class ToolsCallTest < ActionDispatch::IntegrationTest
     post "/mcp", params: { jsonrpc: "2.0", id: 1, method: "tools/call", params: { name: "shop__restock", arguments: { item: "soap", count: 4, colour: "red" } } }, headers: { "X-Person" => "lee", "X-Account" => "acme" }, as: :json
 
     assert_equal({ "code" => -32602, "message" => "Unknown tool: shop__restock" }, response.parsed_body["error"])
+  end
+
+  test "a call naming a record that does not exist comes back as a tool error naming the kind of record and the id" do
+    post "/mcp", params: { jsonrpc: "2.0", id: 1, method: "tools/call", params: { name: "stockroom__shelf_of", arguments: { item_id: 9 } } }, headers: { "X-Person" => "sam", "X-Account" => "acme" }, as: :json
+
+    assert_equal({ "content" => [ { "type" => "text", "text" => "No item has the id 9" } ], "isError" => true }, response.parsed_body["result"])
   end
 end

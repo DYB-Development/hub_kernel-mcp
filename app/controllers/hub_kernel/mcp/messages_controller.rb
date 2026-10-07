@@ -43,8 +43,12 @@ module HubKernel
         answer = hub.call_exposed(method_name, values: arguments, person: caller_person, account: caller_account)
         { content: [ { type: "text", text: answer.to_json } ], isError: false }
       rescue HubKernel::Refused, HubKernel::MissingArgumentError => refusal
-        { content: [ { type: "text", text: refusal.message } ], isError: true }
+        tool_error(refusal.message)
+      rescue ActiveRecord::RecordNotFound => missing
+        tool_error(HubKernel::Interface::CallReasons.missing_record(missing))
       end
+
+      def tool_error(reason) = { content: [ { type: "text", text: reason } ], isError: true }
 
       def tool_name = params.dig(:params, :name).to_s
 
