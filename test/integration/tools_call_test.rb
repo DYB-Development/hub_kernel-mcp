@@ -18,4 +18,10 @@ class ToolsCallTest < ActionDispatch::IntegrationTest
 
     assert_equal({ "code" => -32602, "message" => "Unknown tool: shop__close_shop" }, response.parsed_body["error"])
   end
+
+  test "a tool naming a hub the host does not serve is answered with an unknown-tool error" do
+    post "/mcp", params: { jsonrpc: "2.0", id: 1, method: "tools/call", params: { name: "back_office__close_books", arguments: {} } }, headers: { "X-Person" => "sam", "X-Account" => "acme" }, as: :json
+
+    assert_equal "Unknown tool: back_office__close_books", response.parsed_body.dig("error", "message")
+  end
 end
