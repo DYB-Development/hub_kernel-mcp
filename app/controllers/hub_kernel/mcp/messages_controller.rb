@@ -2,24 +2,44 @@ module HubKernel
   module Mcp
     class MessagesController < HubKernel::Mcp.base_controller.constantize
       UnknownTool = Class.new(StandardError)
+      UnknownMethod = Class.new(StandardError)
 
       PROTOCOL_VERSIONS = %w[2025-11-25 2025-06-18 2025-03-26 2024-11-05].freeze
 
+      rescue_from(ActionDispatch::Http::Parameters::ParseError) { render_error(-32700, "Parse error") }
+
       def create
+        return render_error(-32600, "Invalid Request") unless single_request?
         return head :accepted unless params.key?(:id)
 
         render json: { jsonrpc: "2.0", id: params[:id], result: answer }
       rescue UnknownTool, HubKernel::UnexposedMethodError, HubKernel::NotAllowed
-        render json: { jsonrpc: "2.0", id: params[:id], error: { code: -32602, message: "Unknown tool: #{tool_name}" } }
+        render_error(-32602, "Unknown tool: #{tool_name}", id: params[:id])
+      rescue UnknownMethod
+        render_error(-32601, "Method not found: #{params[:method]}", id: params[:id])
+      rescue StandardError => error
+        Rails.error.report(error, handled: true)
+        render_error(-32603, "Internal error", id: params[:id])
+      end
+
+      def refuse_get
+        response.set_header("Allow", "POST")
+        head :method_not_allowed
       end
 
       private
 
+      def single_request? = !params.key?(:_json) && params[:jsonrpc] == "2.0" && params[:method].is_a?(String)
+
+      def render_error(code, message, id: nil) = render(json: { jsonrpc: "2.0", id: id, error: { code: code, message: message } })
+
       def answer
         case params[:method]
         when "initialize" then initialized
+        when "ping" then {}
         when "tools/list" then { tools: tools }
         when "tools/call" then called
+        else raise UnknownMethod
         end
       end
 

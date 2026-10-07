@@ -2,6 +2,14 @@
 
 ## [Unreleased]
 
+## [0.6.0] - 2026-10-07
+
+### Added
+- A `ping` is answered with an empty result.
+- A body that is not valid JSON, a body that is not one JSON-RPC request, and an MCP method the endpoint does not support are each answered with their JSON-RPC error.
+- An unexpected error inside a hub method is answered as an internal error without its message, and reported to the host app's error reporting.
+- A GET to the endpoint's address is answered with status 405.
+
 ## [0.5.0] - 2026-10-07
 
 ### Changed

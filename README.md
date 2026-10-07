@@ -75,6 +75,20 @@ naming a hub the host does not serve are all answered with the same JSON-RPC err
 
 A caller the host's sign-in refuses is refused before any hub is asked.
 
+A `ping` is answered with an empty result. Every other request the endpoint cannot answer gets
+a JSON-RPC error:
+
+| Request | Code | Message |
+|---|---|---|
+| A body that is not valid JSON | -32700 | `Parse error` |
+| A body that is not one JSON-RPC request, such as a batch | -32600 | `Invalid Request` |
+| An MCP method the endpoint does not support | -32601 | `Method not found: <method>` |
+| An unexpected error inside a hub method | -32603 | `Internal error` |
+
+An unexpected error's own message is never sent to the client. It is reported to the host
+app's error reporting through `Rails.error`. A GET to the endpoint's address is answered with
+status 405, since the endpoint offers no sessions or server-sent events.
+
 ## Installation
 
 ```ruby
