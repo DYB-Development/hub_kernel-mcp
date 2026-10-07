@@ -24,4 +24,10 @@ class ErrorsTest < ActionDispatch::IntegrationTest
 
     assert_equal({ "jsonrpc" => "2.0", "id" => 5, "result" => {} }, response.parsed_body)
   end
+
+  test "a GET to the address is answered as method not allowed" do
+    get "/mcp", headers: { "X-Person" => "sam", "X-Account" => "acme" }
+
+    assert_response :method_not_allowed
+  end
 end

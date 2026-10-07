@@ -19,6 +19,11 @@ module HubKernel
         render_error(-32601, "Method not found: #{params[:method]}", id: params[:id])
       end
 
+      def refuse_get
+        response.set_header("Allow", "POST")
+        head :method_not_allowed
+      end
+
       private
 
       def single_request? = !params.key?(:_json) && params[:jsonrpc] == "2.0" && params[:method].is_a?(String)
