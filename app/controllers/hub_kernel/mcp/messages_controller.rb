@@ -28,6 +28,7 @@ module HubKernel
       def answer
         case params[:method]
         when "initialize" then initialized
+        when "ping" then {}
         when "tools/list" then { tools: tools }
         when "tools/call" then called
         else raise UnknownMethod

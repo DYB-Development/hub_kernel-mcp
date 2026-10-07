@@ -18,4 +18,10 @@ class ErrorsTest < ActionDispatch::IntegrationTest
 
     assert_equal({ "jsonrpc" => "2.0", "id" => 4, "error" => { "code" => -32601, "message" => "Method not found: resources/list" } }, response.parsed_body)
   end
+
+  test "a ping is answered with an empty result" do
+    post "/mcp", params: { jsonrpc: "2.0", id: 5, method: "ping" }, headers: { "X-Person" => "sam", "X-Account" => "acme" }, as: :json
+
+    assert_equal({ "jsonrpc" => "2.0", "id" => 5, "result" => {} }, response.parsed_body)
+  end
 end
