@@ -15,6 +15,7 @@ module HubKernel
         case params[:method]
         when "initialize" then initialized
         when "tools/list" then { tools: tools }
+        when "tools/call" then called
         end
       end
 
@@ -29,6 +30,14 @@ module HubKernel
       end
 
       def tool(served_name, exposure) = { name: "#{served_name}__#{exposure.name}", inputSchema: { type: "object", properties: exposure.takes.index_with { {} } } }
+
+      def called
+        served_name, method_name = params.dig(:params, :name).split("__", 2)
+        answer = HubKernel::Interface.find(served_name).call_exposed(method_name, values: arguments, person: caller_person, account: caller_account)
+        { content: [ { type: "text", text: answer.to_json } ], isError: false }
+      end
+
+      def arguments = params.dig(:params, :arguments).to_unsafe_h.deep_symbolize_keys
 
       def caller_person = send(HubKernel::Mcp.person_method)
 
