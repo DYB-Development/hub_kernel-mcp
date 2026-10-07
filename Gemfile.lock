@@ -1,7 +1,7 @@
 PATH
   remote: .
   specs:
-    hub_kernel-mcp (0.3.0)
+    hub_kernel-mcp (0.4.0)
       hub_kernel-interface (~> 0.6)
       rails (>= 8.1.3)
 
