@@ -2,6 +2,11 @@
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-10-06
+
+### Added
+- `tools/call`, which runs the hub method a tool names and returns its answer, or the hub's refusal as a tool error.
+
 ## [0.1.0] - 2026-10-06
 
 ### Added

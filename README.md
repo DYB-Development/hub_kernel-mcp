@@ -43,6 +43,18 @@ its input schema names the values the method takes:
 { "name": "supplies__price_of", "inputSchema": { "type": "object", "properties": { "item": {} } } }
 ```
 
+`tools/call` runs the hub method a tool names, for the person and account the host's methods
+give, and returns the method's answer as JSON text:
+
+```json
+{ "content": [ { "type": "text", "text": "\"soap costs 3\"" } ], "isError": false }
+```
+
+A hub's refusal, or a value the method requires and the call left out, comes back as a tool
+error carrying the reason, with `isError` set. A tool the caller may not call, a tool that does
+not exist, and a tool naming a hub the host does not serve are all answered with the same
+JSON-RPC error, code -32602, `Unknown tool: <name>`.
+
 A caller the host's sign-in refuses is refused before any hub is asked.
 
 ## Installation
