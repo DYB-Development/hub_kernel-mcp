@@ -2,7 +2,7 @@ PATH
   remote: .
   specs:
     hub_kernel-mcp (0.3.0)
-      hub_kernel-interface (~> 0.3)
+      hub_kernel-interface (~> 0.6)
       rails (>= 8.1.3)
 
 GEM
@@ -95,7 +95,7 @@ GEM
     erubi (1.13.1)
     globalid (1.4.0)
       activesupport (>= 6.1)
-    hub_kernel-interface (0.3.0)
+    hub_kernel-interface (0.6.0)
       activesupport (>= 8.1.3)
     i18n (1.15.2)
       concurrent-ruby (~> 1.0)
