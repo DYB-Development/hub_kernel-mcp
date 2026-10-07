@@ -40,7 +40,7 @@ module HubKernel
         hub = HubKernel::Interface.find(served_name) || raise(UnknownTool)
         answer = hub.call_exposed(method_name, values: arguments, person: caller_person, account: caller_account)
         { content: [ { type: "text", text: answer.to_json } ], isError: false }
-      rescue HubKernel::Refused => refusal
+      rescue HubKernel::Refused, HubKernel::MissingArgumentError => refusal
         { content: [ { type: "text", text: refusal.message } ], isError: true }
       end
 

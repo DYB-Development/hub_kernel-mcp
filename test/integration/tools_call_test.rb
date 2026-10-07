@@ -51,4 +51,10 @@ class ToolsCallTest < ActionDispatch::IntegrationTest
 
     assert_equal({ "content" => [ { "type" => "text", "text" => "The soap shelf is full" } ], "isError" => true }, response.parsed_body["result"])
   end
+
+  test "a call missing a value the method requires comes back as a tool error naming the missing values" do
+    post "/mcp", params: { jsonrpc: "2.0", id: 1, method: "tools/call", params: { name: "shop__restock", arguments: { item: "soap" } } }, headers: { "X-Person" => "sam", "X-Account" => "acme" }, as: :json
+
+    assert_equal({ "content" => [ { "type" => "text", "text" => "Give count" } ], "isError" => true }, response.parsed_body["result"])
+  end
 end
