@@ -73,4 +73,10 @@ class ToolsCallTest < ActionDispatch::IntegrationTest
 
     assert_equal({ "content" => [ { "type" => "text", "text" => "price_of does not take colour" } ], "isError" => true }, response.parsed_body["result"])
   end
+
+  test "a call the permission check refuses is answered as an unknown tool even when it sends a value its method is not listed with" do
+    post "/mcp", params: { jsonrpc: "2.0", id: 1, method: "tools/call", params: { name: "shop__restock", arguments: { item: "soap", count: 4, colour: "red" } } }, headers: { "X-Person" => "lee", "X-Account" => "acme" }, as: :json
+
+    assert_equal({ "code" => -32602, "message" => "Unknown tool: shop__restock" }, response.parsed_body["error"])
+  end
 end
