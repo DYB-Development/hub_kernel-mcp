@@ -23,4 +23,12 @@ class McpCheckTest < ActiveSupport::TestCase
 
     assert_equal "Shop is served at back__room, which holds two underscores in a row", error.message
   end
+
+  test "a tool name holding a character other than a letter, a digit, an underscore or a hyphen is named" do
+    HubKernel::Interface.hubs = [ { "money box" => Ledger } ]
+
+    error = assert_raises(HubKernel::Mcp::UnservableHubError) { HubKernel::Mcp.check! }
+
+    assert_equal "The tool money box__record_spend holds a character other than a letter, a digit, an underscore or a hyphen", error.message
+  end
 end

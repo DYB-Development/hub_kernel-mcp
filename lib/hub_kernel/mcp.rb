@@ -11,7 +11,7 @@ module HubKernel
     mattr_accessor :account_method
 
     def self.check!
-      problems = shared_problems + doubled_underscores
+      problems = shared_problems + doubled_underscores + unlisted_characters
       raise UnservableHubError, problems.join("\n") if problems.any?
     end
 
@@ -28,6 +28,18 @@ module HubKernel
       end
     end
 
-    private_class_method :shared_problems, :doubled_underscores
+    def self.unlisted_characters
+      tool_names.grep_v(/\A[A-Za-z0-9_-]*\z/).map do |name|
+        "The tool #{name} holds a character other than a letter, a digit, an underscore or a hyphen"
+      end
+    end
+
+    def self.tool_names
+      HubKernel::Interface.served.select { |_name, hub| hub.respond_to?(:exposures) }.flat_map do |served_name, hub|
+        hub.exposures.map { |exposure| "#{served_name}__#{exposure.name}" }
+      end
+    end
+
+    private_class_method :shared_problems, :doubled_underscores, :unlisted_characters, :tool_names
   end
 end
