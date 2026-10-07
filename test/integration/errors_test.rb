@@ -6,4 +6,10 @@ class ErrorsTest < ActionDispatch::IntegrationTest
 
     assert_equal({ "jsonrpc" => "2.0", "id" => nil, "error" => { "code" => -32700, "message" => "Parse error" } }, response.parsed_body)
   end
+
+  test "a batch of requests is answered with an invalid-request error" do
+    post "/mcp", params: [ { jsonrpc: "2.0", id: 1, method: "tools/list" } ].to_json, headers: { "Content-Type" => "application/json", "X-Person" => "sam", "X-Account" => "acme" }
+
+    assert_equal({ "jsonrpc" => "2.0", "id" => nil, "error" => { "code" => -32600, "message" => "Invalid Request" } }, response.parsed_body)
+  end
 end

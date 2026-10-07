@@ -5,19 +5,22 @@ module HubKernel
 
       PROTOCOL_VERSIONS = %w[2025-11-25 2025-06-18 2025-03-26 2024-11-05].freeze
 
-      rescue_from ActionDispatch::Http::Parameters::ParseError do
-        render json: { jsonrpc: "2.0", id: nil, error: { code: -32700, message: "Parse error" } }
-      end
+      rescue_from(ActionDispatch::Http::Parameters::ParseError) { render_error(-32700, "Parse error") }
 
       def create
+        return render_error(-32600, "Invalid Request") unless single_request?
         return head :accepted unless params.key?(:id)
 
         render json: { jsonrpc: "2.0", id: params[:id], result: answer }
       rescue UnknownTool, HubKernel::UnexposedMethodError, HubKernel::NotAllowed
-        render json: { jsonrpc: "2.0", id: params[:id], error: { code: -32602, message: "Unknown tool: #{tool_name}" } }
+        render_error(-32602, "Unknown tool: #{tool_name}", id: params[:id])
       end
 
       private
+
+      def single_request? = !params.key?(:_json) && params[:jsonrpc] == "2.0" && params[:method].is_a?(String)
+
+      def render_error(code, message, id: nil) = render(json: { jsonrpc: "2.0", id: id, error: { code: code, message: message } })
 
       def answer
         case params[:method]
