@@ -41,4 +41,11 @@ class ToolsListTest < ActionDispatch::IntegrationTest
     restock = response.parsed_body.dig("result", "tools").find { |tool| tool["name"] == "shop__restock" }
     assert_equal false, restock.dig("annotations", "readOnlyHint")
   end
+
+  test "every tool carries a description naming its hub and saying whether it reads or changes data" do
+    post "/mcp", params: { jsonrpc: "2.0", id: 1, method: "tools/list" }, headers: { "X-Person" => "sam", "X-Account" => "acme" }, as: :json
+
+    descriptions = response.parsed_body.dig("result", "tools").to_h { |tool| [ tool["name"], tool["description"] ] }
+    assert_equal({ "shop__price_of" => "Reads data from the shop hub.", "shop__restock" => "Changes data in the shop hub.", "money__record_spend" => "Changes data in the money hub." }, descriptions)
+  end
 end
