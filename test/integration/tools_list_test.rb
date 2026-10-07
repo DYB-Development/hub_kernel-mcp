@@ -34,4 +34,11 @@ class ToolsListTest < ActionDispatch::IntegrationTest
     price_of = response.parsed_body.dig("result", "tools").find { |tool| tool["name"] == "shop__price_of" }
     assert_equal true, price_of.dig("annotations", "readOnlyHint")
   end
+
+  test "a tool for a method that writes is marked as one that changes data" do
+    post "/mcp", params: { jsonrpc: "2.0", id: 1, method: "tools/list" }, headers: { "X-Person" => "sam", "X-Account" => "acme" }, as: :json
+
+    restock = response.parsed_body.dig("result", "tools").find { |tool| tool["name"] == "shop__restock" }
+    assert_equal false, restock.dig("annotations", "readOnlyHint")
+  end
 end

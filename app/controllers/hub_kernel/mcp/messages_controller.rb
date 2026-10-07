@@ -33,7 +33,7 @@ module HubKernel
         end
       end
 
-      def tool(served_name, exposure) = { name: "#{served_name}__#{exposure.name}", inputSchema: { type: "object", properties: exposure.takes.index_with { {} } }, annotations: { readOnlyHint: true } }
+      def tool(served_name, exposure) = { name: "#{served_name}__#{exposure.name}", inputSchema: { type: "object", properties: exposure.takes.index_with { {} } }, annotations: { readOnlyHint: !exposure.writes } }
 
       def called
         served_name, method_name = tool_name.split("__", 2)
