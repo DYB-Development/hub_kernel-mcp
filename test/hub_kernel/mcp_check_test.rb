@@ -15,4 +15,12 @@ class McpCheckTest < ActiveSupport::TestCase
 
     assert_equal "McpCheckTest::Silent exposes no methods to serve", error.message
   end
+
+  test "a served name holding two underscores in a row is named with its hub" do
+    HubKernel::Interface.hubs = [ { "back__room" => Shop } ]
+
+    error = assert_raises(HubKernel::Mcp::UnservableHubError) { HubKernel::Mcp.check! }
+
+    assert_equal "Shop is served at back__room, which holds two underscores in a row", error.message
+  end
 end

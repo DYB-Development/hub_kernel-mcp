@@ -10,6 +10,24 @@ module HubKernel
     mattr_accessor :person_method
     mattr_accessor :account_method
 
-    def self.check! = HubKernel::Interface.check!
+    def self.check!
+      problems = shared_problems + doubled_underscores
+      raise UnservableHubError, problems.join("\n") if problems.any?
+    end
+
+    def self.shared_problems
+      HubKernel::Interface.check!
+      []
+    rescue UnservableHubError => error
+      error.message.split("\n")
+    end
+
+    def self.doubled_underscores
+      HubKernel::Interface.served.select { |name, _hub| name.include?("__") }.map do |name, hub|
+        "#{hub.name} is served at #{name}, which holds two underscores in a row"
+      end
+    end
+
+    private_class_method :shared_problems, :doubled_underscores
   end
 end
