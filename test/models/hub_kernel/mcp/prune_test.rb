@@ -26,6 +26,17 @@ class HubKernel::Mcp::PruneTest < ActiveSupport::TestCase
     assert_equal [ Person.new("kim") ], HubKernel::Mcp::Connection.all.map(&:person)
   end
 
+  test "pruning removes clients with no connection older than a day and keeps the rest" do
+    HubKernel::Mcp::Client.create!(name: "Abandoned", redirect_uris: [ "https://claude.ai/callback" ])
+    HubKernel::Mcp::Connection.issue(person: Person.new("sam"), client: @client)
+    travel 1.day + 1.second
+    HubKernel::Mcp::Client.create!(name: "New", redirect_uris: [ "https://claude.ai/callback" ])
+
+    HubKernel::Mcp::Prune.call
+
+    assert_equal [ "Claude", "New" ], HubKernel::Mcp::Client.order(:name).pluck(:name)
+  end
+
   private
 
   def issue_code = HubKernel::Mcp::AuthorizationCode.issue(person: Person.new("sam"), client: @client, redirect_uri: "https://claude.ai/callback", code_challenge: "challenge")
