@@ -1,8 +1,8 @@
 ---
 name: hub_kernel-mcp-install
-description: Use to hook hub_kernel-mcp into a project — adding the gem, naming the controller the endpoint inherits from and the person and account methods on it, naming the browser controller, sign-in method, person method and layout the approval page runs with, running the boot check after the served list is set, mounting the engine, and, for sign-in from a connector screen, installing the migrations, mounting the discovery documents, and having the host's sign-in look up the person an access token acts for.
+description: Use to hook hub_kernel-mcp into a project — adding the gem, naming the controller the endpoint inherits from and the person and account methods on it, naming the browser controller, sign-in method, person method and layout the approval page runs with, running the boot check after the served list is set, mounting the engine, and, for sign-in from a connector screen, installing the migrations, mounting the discovery documents, having the host's sign-in look up the person an access token acts for, and registering the settings section that lists a person's connections and disconnects one.
 tools: Bash, Read, Edit
-scope: hub MCP tools — serving the methods every hub a host serves, from hub_kernel-interface's one served list, as MCP tools at one JSON-RPC endpoint in a host Rails app, each call behind the host's own sign-in and hub_kernel-interface's permission check and account scope, with a boot check for hubs that cannot be served as tools, the OAuth discovery documents, 401 challenge and client registration that let a client such as Claude's connector screen find the endpoint's sign-in and register by itself, and the approval page where a person signed in to the host through the browser approves that client and is issued an authorization code, the token exchange that trades that code with its PKCE verifier for an access token lasting an hour and a refresh token, the refresh exchange that trades a refresh token for a new access token and a new refresh token and retires the one posted, and the lookup a host's sign-in calls to get the person a bearer token acts for
+scope: hub MCP tools — serving the methods every hub a host serves, from hub_kernel-interface's one served list, as MCP tools at one JSON-RPC endpoint in a host Rails app, each call behind the host's own sign-in and hub_kernel-interface's permission check and account scope, with a boot check for hubs that cannot be served as tools, the OAuth discovery documents, 401 challenge and client registration that let a client such as Claude's connector screen find the endpoint's sign-in and register by itself, and the approval page where a person signed in to the host through the browser approves that client and is issued an authorization code, the token exchange that trades that code with its PKCE verifier for an access token lasting an hour and a refresh token, the refresh exchange that trades a refresh token for a new access token and a new refresh token and retires the one posted, and the lookup a host's sign-in calls to get the person a bearer token acts for, which records when the connection was last used, and the settings section a host registers with settings_hub that lists a person's connections with the app's name, when it connected and when it was last used, and disconnects one that is the person's own
 ---
 
 This local follows these steps exactly and invents none. Where a step names a
@@ -31,13 +31,13 @@ a signed-in person's behalf.
 - `mount HubKernel::Mcp::Discovery` — mounts the two OAuth discovery documents
   in the host's `config/routes.rb`. It must be mounted at `"/.well-known"`,
   since the endpoint's 401 header names that path.
-- `bin/rails hub_kernel_mcp:install:migrations` — copies the gem's four
+- `bin/rails hub_kernel_mcp:install:migrations` — copies the gem's five
   migrations into the host's `db/migrate`. They create the
   `hub_kernel_mcp_clients` table, which holds each client that registers, the
   `hub_kernel_mcp_authorization_codes` table, which holds each code the
   approval page issues, and the `hub_kernel_mcp_connections` table, which holds
   each access token issued for a code, and then add the refresh token's columns
-  to `hub_kernel_mcp_connections`.
+  and a `last_used_at` column to `hub_kernel_mcp_connections`.
 - `HubKernel::Mcp.base_controller=` — the name, as a String, of the host
   controller the endpoint inherits from. Its before-actions, including sign-in,
   run before any hub is asked. Defaults to `"ActionController::API"`, which has
@@ -69,8 +69,23 @@ a signed-in person's behalf.
 - `HubKernel::Mcp::Connection.person_for` — takes the bearer token a client
   sends, as a String, and returns the person who approved the client the token
   was issued to. Returns `nil` for a token that is unknown, more than an hour
-  old, or replaced by a refresh. The host's sign-in on the base controller
-  calls it.
+  old, replaced by a refresh, or disconnected. Each time it returns a person it
+  records the time as the connection's last use. The host's sign-in on the base
+  controller calls it.
+- `SettingsHub.section` — settings_hub's call that registers a section on the
+  host's settings page. The host calls it once to register the connections
+  section, naming the partial and the action below.
+- `hub_kernel/mcp/connections` — the partial that lists the signed-in person's
+  connections, one per approved client, each with the app's name, when it
+  connected, when it was last used or `Never used`, and a Disconnect button. It
+  takes two locals: `person`, and `submit_url`, the address each button sends a
+  PATCH carrying `connection_id` to.
+- `HubKernel::Mcp::Disconnect` — the action the Disconnect button runs. It is
+  built with `new(person:, account:, values:)`, where `values[:connection_id]`
+  names the connection, and `call` returns a result. The result's `ok?` is true
+  when the person's own connection was removed, and false with a `message` of
+  `That connection is not one of yours` otherwise. A removed connection's access
+  and refresh tokens stop working at once.
 
 ## How to use it
 
@@ -160,7 +175,7 @@ a signed-in person's behalf.
 8. Ask the developer whether a client such as Claude's connector screen should
    find the endpoint's sign-in, register and be approved by a person, so a
    person only pastes the endpoint's address. If not, stop here and skip steps
-   9 to 13.
+   9 to 14.
 
 9. Copy the gem's migrations into the host and run them:
 
@@ -168,9 +183,9 @@ a signed-in person's behalf.
    bin/rails hub_kernel_mcp:install:migrations db:migrate
    ```
 
-   This adds four migrations to the host's `db/migrate` and the
+   This adds five migrations to the host's `db/migrate` and the
    `hub_kernel_mcp_clients`, `hub_kernel_mcp_authorization_codes` and
-   `hub_kernel_mcp_connections` tables to `db/schema.rb`. Commit all five files.
+   `hub_kernel_mcp_connections` tables to `db/schema.rb`. Commit all six files.
 
 10. Add the discovery mount to `config/routes.rb`, at the site root beside the
     endpoint's mount, at exactly `"/.well-known"`:
@@ -222,6 +237,34 @@ a signed-in person's behalf.
     calls any host route helper without `main_app.`, show the developer each one
     and ask whether to prefix them or to name a different layout.
 
+14. Ask the developer whether a person should see the apps connected as them
+    and be able to disconnect one, and whether the host's settings page is
+    built with settings_hub. If they want the section and the host uses
+    settings_hub, register it where the host registers its other settings_hub
+    sections:
+
+    ```ruby
+    SettingsHub.section :connections, area: :user, title: "Connected apps",
+      renders: "hub_kernel/mcp/connections", runs: "HubKernel::Mcp::Disconnect"
+    ```
+
+    Ask the developer for the title, and do not change `area: :user`, since the
+    list is the signed-in person's own. If the host has no settings_hub section
+    registered anywhere yet, ask where sections are registered before adding
+    one. If the host does not use settings_hub, ask the developer where the list
+    should appear, then render the partial there with the signed-in person and
+    a host route that accepts a PATCH:
+
+    ```erb
+    <%= render "hub_kernel/mcp/connections", person: current_user, submit_url: connections_path %>
+    ```
+
+    That route's action builds
+    `HubKernel::Mcp::Disconnect.new(person: current_user, account: nil, values: { connection_id: params[:connection_id] })`,
+    calls `call`, and shows the result's `message` when `ok?` is false. Ask the
+    developer for the route's path and where to send the person afterwards, and
+    do not choose either.
+
 ## Conventions
 
 - After installing, boot the app or run `bin/rails runner "HubKernel::Mcp.check!"`.
@@ -251,9 +294,15 @@ a signed-in person's behalf.
   `Authorization: Bearer unknown`, which should answer 401.
 - Run `bin/rails hub_kernel_mcp:install:migrations` again after upgrading the
   gem, then `db:migrate`. It copies only migrations the host does not have yet.
-  A host that installed an earlier version with two or three migrations gets
-  the missing ones this way, and the token address answers with an error until
-  they are run.
+  A host that installed an earlier version with fewer than five migrations gets
+  the missing ones this way. Until they are run, the token address answers with
+  an error, or the token lookup and the connections list fail on the missing
+  `last_used_at` column.
+- With the connections section installed, sign in and open the settings page:
+  each app approved as that person is listed, a connection whose token has not
+  been looked up since the `last_used_at` migration ran shows `Never used`, and
+  Disconnect removes the row. A request with that connection's access token
+  then answers 401.
 - An access token lasts one hour. A refresh token lasts ninety days from when
   it was issued, works only for the client it was issued to, and works once:
   trading it retires it and the access token issued with it. A client that
@@ -262,6 +311,7 @@ a signed-in person's behalf.
   token, so its client signs in again through the approval page once the
   access token expires.
 - Out of scope: choosing which hubs are served and setting permissions and
-  account scope, which belong to hub_kernel-interface, and changing what the
-  endpoint, the discovery documents or the approval page answer, which belongs
-  to `hub_kernel-mcp-develop`.
+  account scope, which belong to hub_kernel-interface, building the settings
+  page itself, which belongs to settings_hub, and changing what the endpoint,
+  the discovery documents, the approval page or the connections section
+  answer, which belongs to `hub_kernel-mcp-develop`.

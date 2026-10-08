@@ -1,8 +1,8 @@
 ---
 name: hub_kernel-mcp-info
-description: Use to learn what hub_kernel-mcp offers — serving a host's hubs as MCP tools, how tools are named and scoped, how a client such as Claude's connector screen finds the endpoint's sign-in, registers itself, is approved by a person through the browser, trades its code for an access token and a refresh token and later trades the refresh token for a new pair, how the host's sign-in finds the person a token acts for, and the vocabulary the install and develop locals assume.
+description: Use to learn what hub_kernel-mcp offers — serving a host's hubs as MCP tools, how tools are named and scoped, how a client such as Claude's connector screen finds the endpoint's sign-in, registers itself, is approved by a person through the browser, trades its code for an access token and a refresh token and later trades the refresh token for a new pair, how the host's sign-in finds the person a token acts for, how a person sees and disconnects the apps connected as them, and the vocabulary the install and develop locals assume.
 tools: Read
-scope: hub MCP tools — serving the methods every hub a host serves, from hub_kernel-interface's one served list, as MCP tools at one JSON-RPC endpoint in a host Rails app, each call behind the host's own sign-in and hub_kernel-interface's permission check and account scope, with a boot check for hubs that cannot be served as tools, the OAuth discovery documents, 401 challenge and client registration that let a client such as Claude's connector screen find the endpoint's sign-in and register by itself, and the approval page where a person signed in to the host through the browser approves that client and is issued an authorization code, the token exchange that trades that code with its PKCE verifier for an access token lasting an hour and a refresh token, the refresh exchange that trades a refresh token for a new access token and a new refresh token and retires the one posted, and the lookup a host's sign-in calls to get the person a bearer token acts for
+scope: hub MCP tools — serving the methods every hub a host serves, from hub_kernel-interface's one served list, as MCP tools at one JSON-RPC endpoint in a host Rails app, each call behind the host's own sign-in and hub_kernel-interface's permission check and account scope, with a boot check for hubs that cannot be served as tools, the OAuth discovery documents, 401 challenge and client registration that let a client such as Claude's connector screen find the endpoint's sign-in and register by itself, and the approval page where a person signed in to the host through the browser approves that client and is issued an authorization code, the token exchange that trades that code with its PKCE verifier for an access token lasting an hour and a refresh token, the refresh exchange that trades a refresh token for a new access token and a new refresh token and retires the one posted, and the lookup a host's sign-in calls to get the person a bearer token acts for, which records when the connection was last used, and the settings section a host registers with settings_hub that lists a person's connections with the app's name, when it connected and when it was last used, and disconnects one that is the person's own
 ---
 
 This local explains hub_kernel-mcp and makes no changes.
@@ -37,6 +37,12 @@ sends the access token on every request, and the host's sign-in asks the gem
 which person the token acts for. A person using Claude's connector screen only
 pastes the endpoint's address.
 
+A person can see which apps are connected as them, and cut one off. The gem
+ships a section for a host's settings page, registered through settings_hub,
+that lists each of the person's connections with the app's name, when it
+connected and when it was last used, and a Disconnect button for each. A
+disconnected app's tokens stop working at once.
+
 ## Interface
 
 This local declares no entry points of its own.
@@ -44,24 +50,27 @@ This local declares no entry points of its own.
 - Adding the gem to a host, mounting the endpoint and the discovery documents,
   installing the client, authorization code and connection tables, configuring
   which controllers, person, account and sign-in methods and layout it uses,
-  running the boot check, and calling the token lookup from the host's sign-in
-  are owned by the install local, `hub_kernel-mcp-install`.
+  running the boot check, calling the token lookup from the host's sign-in, and
+  registering the connections section and its disconnect action with
+  settings_hub are owned by the install local, `hub_kernel-mcp-install`.
 - The endpoint itself, the MCP requests it answers, the discovery documents,
   the challenge on a refused request, client registration, the approval page,
-  the token exchange and the refresh exchange are owned by the develop local,
-  `hub_kernel-mcp-develop`.
+  the token exchange, the refresh exchange and the query for a person's
+  connections are owned by the develop local, `hub_kernel-mcp-develop`.
 
 ## How to use it
 
 - To put hub_kernel-mcp into a Rails app, to let a connector screen sign in to
   it, to point the approval page at the host's browser sign-in and layout, to
-  make the host's sign-in accept the access tokens this gem issues, or to fix a
-  host whose boot check fails, use `hub_kernel-mcp-install`.
+  make the host's sign-in accept the access tokens this gem issues, to add the
+  connected apps section to the host's settings page, or to fix a host whose
+  boot check fails, use `hub_kernel-mcp-install`.
 - To change what the endpoint answers, add support for another MCP request,
   change how tools are listed, called or refused, change what the discovery
   documents and registration say, change what the approval page checks and
   shows, change when a code or a refresh token is traded for new tokens, or
-  change how long either token lasts, use `hub_kernel-mcp-develop`.
+  change how long either token lasts, or change which connections count as a
+  person's own, use `hub_kernel-mcp-develop`.
 - To decide which hubs are served at all, or to change permissions and account
   scope, work in hub_kernel-interface, which owns the served list and those
   checks.
@@ -133,5 +142,15 @@ This local declares no entry points of its own.
   posting the same token at once only one succeeds.
 - **Token lookup** — what the host's sign-in calls with the bearer token from a
   request. It gives the person the access token acts for while the token is
-  unexpired, and nothing for an expired, replaced or unknown token. The account
-  a call is made in still comes from the host's account method.
+  unexpired, and nothing for an expired, replaced or unknown token. Each lookup
+  that finds a person records the time on the connection as when it was last
+  used. The account a call is made in still comes from the host's account
+  method.
+- **Connections section** — the part of a host's settings page that lists the
+  signed-in person's connections, oldest first, each with the app's name, when
+  it connected, and when it was last used or that it was never used. It is
+  given the person and the address its Disconnect buttons post to.
+- **Disconnect** — the action a Disconnect button runs. It deletes the
+  connection, so both of its tokens stop working at once. A connection that is
+  not the person's own is left alone and the person is told it is not one of
+  theirs.
