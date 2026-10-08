@@ -77,6 +77,12 @@ class TokenTest < ActionDispatch::IntegrationTest
     assert_equal [ 400, { "error" => "unsupported_grant_type", "error_description" => "The token address takes authorization_code or refresh_token" }, 0 ], [ response.status, response.parsed_body, HubKernel::Mcp::Connection.count ]
   end
 
+  test "a token request whose body cannot be read is answered with the OAuth error and why" do
+    post "/mcp/token", params: "{", headers: { "Content-Type" => "application/json" }
+
+    assert_equal [ 400, { "error" => "invalid_request", "error_description" => "The token request body could not be read" } ], [ response.status, response.parsed_body ]
+  end
+
   private
 
   def assert_refused

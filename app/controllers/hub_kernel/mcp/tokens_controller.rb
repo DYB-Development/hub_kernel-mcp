@@ -4,6 +4,8 @@ module HubKernel
       UNUSABLE_CODE = "The code is unknown, used, expired, or does not match this client, redirect address or verifier".freeze
       UNUSABLE_REFRESH_TOKEN = "The refresh token is unknown, used, unused for ninety days, or belongs to another client".freeze
 
+      rescue_from(ActionDispatch::Http::Parameters::ParseError) { refuse("invalid_request", "The token request body could not be read") }
+
       def create
         case params[:grant_type]
         when "authorization_code" then answer(exchanged, UNUSABLE_CODE)
