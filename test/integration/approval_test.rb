@@ -62,6 +62,35 @@ class ApprovalTest < ActionDispatch::IntegrationTest
     assert_redirected_to "https://claude.ai/callback?error=invalid_request&error_description=A+PKCE+challenge+using+S256+is+required&state=xyz"
   end
 
+  test "an approval request naming an unknown client shows an error page saying so and sends the person nowhere" do
+    sign_in "sam"
+
+    get "/mcp/authorize", params: @approval.merge(client_id: "unknown")
+
+    assert_equal [ 400, nil, "The app asking to connect is not registered" ], [ response.status, response.location, css_select("h1").text ]
+  end
+
+  test "an approval request missing its client id or redirect address shows an error page naming it and sends the person nowhere" do
+    sign_in "sam"
+
+    pages = %i[client_id redirect_uri].map do |missing|
+      get "/mcp/authorize", params: @approval.except(missing)
+      [ response.status, response.location, css_select("h1").text ]
+    end
+
+    assert_equal [ [ 400, nil, "The approval request is missing client_id" ], [ 400, nil, "The approval request is missing redirect_uri" ] ], pages
+  end
+
+  test "an unexpected error on the approval page is reported without its message reaching the person" do
+    sign_in "sam"
+
+    reports = while_failing(HubKernel::Mcp::Client, :find_by) do
+      capture_error_reports { get "/mcp/authorize", params: @approval }
+    end
+
+    assert_equal [ [ RuntimeError ], 500, "Signing in failed unexpectedly" ], [ reports.map { |report| report.error.class }, response.status, css_select("h1").text ]
+  end
+
   private
 
   def sign_in(person) = get("/sign_in", params: { person: person, return_to: "/" })

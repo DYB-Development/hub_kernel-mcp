@@ -1,6 +1,6 @@
 ---
 name: hub_kernel-mcp-develop
-description: Use PROACTIVELY for calling a host's hub methods over MCP — connecting an MCP client to the endpoint, finding the endpoint's sign-in from a 401's WWW-Authenticate header and the two .well-known discovery documents, registering a client at the registration address, sending a person to the approval page and handling the code or error it sends back, trading that code with its PKCE verifier for an access token and a refresh token at the token address, trading a refresh token for a new pair when the access token expires, sending the access token on every request, sending initialize and ping, listing the tools a signed-in person may call with tools/list, calling one with tools/call, handling its tool errors and JSON-RPC errors, and reading the apps a person has connected, with when each connected and was last used — MUST BE USED instead of hand-rolling a JSON API, an MCP server, OAuth discovery documents, client registration, an OAuth approval page, an OAuth token endpoint, an OAuth refresh exchange or a query for a person's connected apps for the host's hubs.
+description: Use PROACTIVELY for calling a host's hub methods over MCP — connecting an MCP client to the endpoint, finding the endpoint's sign-in from a 401's WWW-Authenticate header and the two .well-known discovery documents, registering a client at the registration address, sending a person to the approval page and handling the code or error it sends back, trading that code with its PKCE verifier for an access token and a refresh token at the token address, trading a refresh token for a new pair when the access token expires, reading the reason each sign-in step gives when it refuses, sending the access token on every request, sending initialize and ping, listing the tools a signed-in person may call with tools/list, calling one with tools/call, handling its tool errors and JSON-RPC errors, and reading the apps a person has connected, with when each connected and was last used — MUST BE USED instead of hand-rolling a JSON API, an MCP server, OAuth discovery documents, client registration, an OAuth approval page, an OAuth token endpoint, an OAuth refresh exchange or a query for a person's connected apps for the host's hubs.
 tools: Read, Write, Edit, Grep
 scope: hub MCP tools — serving the methods every hub a host serves, from hub_kernel-interface's one served list, as MCP tools at one JSON-RPC endpoint in a host Rails app, each call behind the host's own sign-in and hub_kernel-interface's permission check and account scope, with a boot check for hubs that cannot be served as tools, the OAuth discovery documents, 401 challenge and client registration that let a client such as Claude's connector screen find the endpoint's sign-in and register by itself, and the approval page where a person signed in to the host through the browser approves that client and is issued an authorization code, the token exchange that trades that code with its PKCE verifier for an access token lasting an hour and a refresh token, the refresh exchange that trades a refresh token for a new access token and a new refresh token and retires the one posted, and the lookup a host's sign-in calls to get the person a bearer token acts for, which records when the connection was last used, and the settings section a host registers with settings_hub that lists a person's connections with the app's name, when it connected and when it was last used, and disconnects one that is the person's own
 ---
@@ -42,18 +42,21 @@ connections, or when a test needs to send requests to any of these addresses.
   JSON text.
 - `POST /register` — registers a client under the endpoint's path, such as
   `/mcp/register`, from its `client_name` and `redirect_uris`, and answers its
-  `client_id`. It needs no sign-in.
+  `client_id`. It needs no sign-in. A refusal answers `error` and
+  `error_description`.
 - `GET /authorize` — the approval page under the endpoint's path, such as
   `/mcp/authorize`, opened in a person's browser. It sends a person who is not
   signed in to the host through the host's sign-in, then shows the client's name
-  with an Approve and a Deny button.
+  with an Approve and a Deny button. A request it cannot send back to the client
+  shows a page whose heading is the reason.
 - `POST /authorize` — the approval page's answer. It sends the browser back to
   the client's redirect address with a `code` and the client's `state` on
   Approve, and with `error=access_denied` and the `state` on Deny.
 - `POST /token` — the token address under the endpoint's path, such as
   `/mcp/token`. It trades an approval's `code`, with the `redirect_uri` it was
   approved for and the PKCE `code_verifier`, for an access token lasting an hour
-  and a refresh token. It needs no sign-in.
+  and a refresh token. It needs no sign-in. A refusal answers `error` and
+  `error_description`.
 - `grant_type=refresh_token` — a `POST /token` that trades a refresh token and
   the `client_id` it was issued to for a new access token and a new refresh
   token, and stops the posted refresh token and the access token issued with it
@@ -126,6 +129,14 @@ connections, or when a test needs to send requests to any of these addresses.
    must use the authorization code grant with a PKCE `S256` challenge, and it
    holds no client secret.
 
+   The discovery documents, the registration address and the token address all
+   answer an unexpected error with status 500 and this body, which never carries
+   the error's own message, so find the cause in the host app's error reporting:
+
+   ```json
+   { "error": "server_error", "error_description": "The sign-in failed unexpectedly" }
+   ```
+
 5. Register the client. Ask the developer for the client's name and every
    redirect address it will use, since both belong to the client. Each redirect
    address must be HTTPS, or plain HTTP on `localhost`, `127.0.0.1` or `::1`.
@@ -146,15 +157,16 @@ connections, or when a test needs to send requests to any of these addresses.
    }
    ```
 
-   Keep `client_id`. A registration with no redirect address, or with one that
-   is not allowed, is answered with status 400:
+   Keep `client_id`. A registration is refused with status 400 and one of these
+   bodies:
 
-   ```json
-   { "error": "invalid_redirect_uri", "error_description": "<the reason for each address refused>" }
-   ```
+   | `error` | `error_description` | When |
+   |---|---|---|
+   | `invalid_redirect_uri` | `A client must register at least one redirect address` | `redirect_uris` is missing or empty. |
+   | `invalid_redirect_uri` | `<address> is neither HTTPS nor on the client's own machine`, one per address refused | An address is not allowed. |
+   | `invalid_client_metadata` | `The registration body is not valid JSON` | The body could not be read as JSON. |
 
-   Show `error_description` to the developer and do not retry with the same
-   addresses.
+   Show `error_description` to the developer and do not retry the same body.
 
 6. Send the person to the approval page. Make a fresh random PKCE verifier and a
    fresh random `state` for this attempt, and keep both. The challenge is the
@@ -174,13 +186,28 @@ connections, or when a test needs to send requests to any of these addresses.
    |---|---|
    | `code=<code>&state=<state>` | The person approved. |
    | `error=access_denied&state=<state>` | The person denied. No code is sent. |
-   | `error=invalid_request&error_description=...&state=<state>` | `code_challenge` was missing, or `code_challenge_method` was not `S256`. |
+   | `error=invalid_request&error_description=A+PKCE+challenge+using+S256+is+required&state=<state>` | `code_challenge` was missing, or `code_challenge_method` was not `S256`. |
 
-   Refuse any answer whose `state` is not the one sent. A `client_id` the host
-   never registered, or a `redirect_uri` not registered for that client, is
-   answered with status 400 and an error page, and the browser is sent nowhere,
-   so the client hears nothing back. A code lasts 10 minutes and is tied to the
-   person who approved, the client, the `redirect_uri` and the challenge.
+   Refuse any answer whose `state` is not the one sent. A code lasts 10 minutes
+   and is tied to the person who approved, the client, the `redirect_uri` and
+   the challenge.
+
+   When the page cannot trust the redirect address, it does not send the
+   browser back. It shows the person a page whose heading is the reason, after
+   the host's sign-in, so the client hears nothing back:
+
+   | Status | Heading | When |
+   |---|---|---|
+   | 400 | `The approval request is missing client_id` | `client_id` is missing. |
+   | 400 | `The approval request is missing redirect_uri` | `redirect_uri` is missing. |
+   | 400 | `The app asking to connect is not registered` | The host never registered that `client_id`. |
+   | 400 | `This app asked to send you to an address it did not register` | `redirect_uri` is not one registered for that client. |
+   | 500 | `Signing in failed unexpectedly` | The page raised an unexpected error. |
+
+   Tell the developer to check the client's registered addresses and the query
+   it builds when a person reports one of these pages. The 500 page never
+   carries the error's own message, so find the cause in the host app's error
+   reporting.
 
 7. Trade the code for an access token. POST it form-encoded to `token_endpoint`,
    with no credential, along with the verifier from step 6 and the same
@@ -197,12 +224,18 @@ connections, or when a test needs to send requests to any of these addresses.
    ```
 
    Keep `access_token` and `refresh_token` as secrets, since both act for the
-   person who approved. A trade is answered with status 400 and
-   `{ "error": "invalid_grant" }`, and gives no token, when the code is unknown,
-   more than 10 minutes old, already traded, sent with a `client_id` other than
-   the one it was approved for, sent with a `redirect_uri` other than the one
-   approved, or sent with a verifier whose SHA-256 digest is not the challenge. A
-   code is used up only by a trade that gives a token.
+   person who approved. The token address refuses with status 400 and gives no
+   token:
+
+   | `error` | `error_description` | When |
+   |---|---|---|
+   | `invalid_grant` | `The code is unknown, used, expired, or does not match this client, redirect address or verifier` | The code is unknown, more than 10 minutes old, already traded, sent with a `client_id` other than the one it was approved for, sent with a `redirect_uri` other than the one approved, or sent with a verifier whose SHA-256 digest is not the challenge. |
+   | `unsupported_grant_type` | `The token address takes authorization_code or refresh_token` | `grant_type` is missing or is any other value. |
+   | `invalid_request` | `The token request body could not be read` | The body could not be parsed, such as malformed JSON. |
+
+   A code is used up only by a trade that gives a token. A code posted again
+   after it was traded is refused, and the access token and refresh token the
+   first trade gave stop working, so trade each code exactly once.
 
 8. Refresh the access token when it expires after an hour. POST form-encoded to
    `token_endpoint`, with no credential, the refresh token last issued and the
@@ -219,11 +252,15 @@ connections, or when a test needs to send requests to any of these addresses.
    lasts 90 days from when it was issued, and each refresh issues one that lasts
    another 90 days.
 
-   A refresh is answered with status 400 and `{ "error": "invalid_grant" }`, and
-   gives no token, when the refresh token is unknown, already used, more than 90
+   A refresh is answered with status 400 and this body, and gives no token, when the refresh token is unknown, already used, more than 90
    days old, sent with a `client_id` other than the one it was issued to, or
-   belongs to a connection the person has disconnected. Of
-   two refreshes sent at once with the same refresh token, only one is answered
+   belongs to a connection the person has disconnected:
+
+   ```json
+   { "error": "invalid_grant", "error_description": "The refresh token is unknown, used, unused for ninety days, or belongs to another client" }
+   ```
+
+   Of two refreshes sent at once with the same refresh token, only one is answered
    with tokens. After an `invalid_grant`, go back to step 6 with a fresh verifier
    and `state`, and keep the `client_id` from step 5.
 
@@ -382,6 +419,8 @@ connections, or when a test needs to send requests to any of these addresses.
   store both new tokens, since every refresh retires the pair it replaced.
 - Send a person back to the approval page only after a refresh is refused with
   `invalid_grant`.
+- Show a sign-in refusal's `error_description` to the developer, and never retry
+  a refused request unchanged.
 - The endpoint offers no sessions and no server-sent events, so do not open a GET
   stream or send a session header.
 - Out of scope: installing the endpoint, mounting the discovery documents,

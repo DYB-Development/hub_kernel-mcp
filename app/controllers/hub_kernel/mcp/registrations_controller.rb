@@ -1,6 +1,12 @@
 module HubKernel
   module Mcp
     class RegistrationsController < ActionController::API
+      rescue_from(StandardError) do |error|
+        Rails.error.report(error, handled: true)
+        render status: :internal_server_error, json: { error: "server_error", error_description: "The sign-in failed unexpectedly" }
+      end
+      rescue_from(ActionDispatch::Http::Parameters::ParseError) { render(status: :bad_request, json: { error: "invalid_client_metadata", error_description: "The registration body is not valid JSON" }) }
+
       def create
         client = Client.new(name: params[:client_name], redirect_uris: Array(params[:redirect_uris]))
         return refuse(client) unless client.save

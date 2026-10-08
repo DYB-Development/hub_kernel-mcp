@@ -1,6 +1,11 @@
 module HubKernel
   module Mcp
     class DiscoveryController < ActionController::API
+      rescue_from(StandardError) do |error|
+        Rails.error.report(error, handled: true)
+        render status: :internal_server_error, json: { error: "server_error", error_description: "The sign-in failed unexpectedly" }
+      end
+
       def resource = render(json: { resource: endpoint_url, authorization_servers: [ request.base_url ] })
 
       def sign_in

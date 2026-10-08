@@ -30,7 +30,7 @@ class TokenTest < ActionDispatch::IntegrationTest
     post "/mcp/token", params: @exchange
     post "/mcp/token", params: @exchange
 
-    assert_equal [ 400, { "error" => "invalid_grant" }, 1 ], [ response.status, response.parsed_body, HubKernel::Mcp::Connection.count ]
+    assert_refused
   end
 
   test "a code posted more than ten minutes after it was made is refused and gives no token" do
@@ -65,9 +65,43 @@ class TokenTest < ActionDispatch::IntegrationTest
     assert_equal [ 200, Person.new("sam"), false ], [ response.status, HubKernel::Mcp::Connection.person_for(answer["access_token"]), answer["refresh_token"].in?([ nil, first["refresh_token"] ]) ]
   end
 
+  test "a refused refresh token is answered with the OAuth error and why" do
+    post "/mcp/token", params: { grant_type: "refresh_token", refresh_token: "unknown", client_id: @client.uid }
+
+    assert_equal [ 400, { "error" => "invalid_grant", "error_description" => "The refresh token is unknown, used, unused for ninety days, or belongs to another client" } ], [ response.status, response.parsed_body ]
+  end
+
+  test "a grant type the token address does not offer is answered with the OAuth error and why" do
+    post "/mcp/token", params: @exchange.merge(grant_type: "password")
+
+    assert_equal [ 400, { "error" => "unsupported_grant_type", "error_description" => "The token address takes authorization_code or refresh_token" }, 0 ], [ response.status, response.parsed_body, HubKernel::Mcp::Connection.count ]
+  end
+
+  test "a token request whose body cannot be read is answered with the OAuth error and why" do
+    post "/mcp/token", params: "{", headers: { "Content-Type" => "application/json" }
+
+    assert_equal [ 400, { "error" => "invalid_request", "error_description" => "The token request body could not be read" } ], [ response.status, response.parsed_body ]
+  end
+
+  test "a code used a second time also stops the tokens issued from it" do
+    post "/mcp/token", params: @exchange
+    issued = response.parsed_body
+    post "/mcp/token", params: @exchange
+
+    assert_equal [ nil, nil ], [ HubKernel::Mcp::Connection.person_for(issued["access_token"]), HubKernel::Mcp::Connection.refresh(issued["refresh_token"], client: @client) ]
+  end
+
+  test "an unexpected error at the token address is reported without its message reaching the client" do
+    reports = while_failing(HubKernel::Mcp::AuthorizationCode, :find_by) do
+      capture_error_reports { post "/mcp/token", params: @exchange }
+    end
+
+    assert_equal [ [ RuntimeError ], 500, { "error" => "server_error", "error_description" => "The sign-in failed unexpectedly" } ], [ reports.map { |report| report.error.class }, response.status, response.parsed_body ]
+  end
+
   private
 
   def assert_refused
-    assert_equal [ 400, { "error" => "invalid_grant" }, 0 ], [ response.status, response.parsed_body, HubKernel::Mcp::Connection.count ]
+    assert_equal [ 400, { "error" => "invalid_grant", "error_description" => "The code is unknown, used, expired, or does not match this client, redirect address or verifier" }, 0 ], [ response.status, response.parsed_body, HubKernel::Mcp::Connection.count ]
   end
 end

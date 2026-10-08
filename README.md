@@ -124,7 +124,8 @@ A client registers by posting its name and redirect addresses to the registratio
 
 It is answered with status 201 and a client id. A registration with no redirect address, or
 with one that is neither HTTPS nor on the client's own machine, is answered with status 400,
-`invalid_redirect_uri`, and the reason.
+`invalid_redirect_uri`, and the reason. A body that is not valid JSON is answered with status
+400 and `invalid_client_metadata`.
 
 The approval address is a browser page. It runs inside a controller of the host's, so the
 host's own sign-in decides who is approving. Name that controller, the method on it that signs a
@@ -142,10 +143,11 @@ kept by its global id, so it must be a record that has one.
 
 A person who is not signed in is sent through the host's sign-in. A signed-in person sees the
 name of the app asking to connect, with an Approve and a Deny button. Approving sends them back
-to the client's redirect address with a code and the client's `state`. Denying sends them back with `error=access_denied` and no code. A request
-naming a redirect address the client did not register shows an error page and sends the person
-nowhere. A request with no PKCE challenge, or one whose method is not `S256`, is sent back with
-`error=invalid_request`.
+to the client's redirect address with a code and the client's `state`. Denying sends them back
+with `error=access_denied` and no code. A request missing its `client_id` or `redirect_uri`,
+naming a client that is not registered, or naming a redirect address the client did not
+register shows an error page saying which, and sends the person nowhere. A request with no PKCE
+challenge, or one whose method is not `S256`, is sent back with `error=invalid_request`.
 
 The client trades the code at the token address, posting it form-encoded with its PKCE verifier,
 the redirect address it was approved for and its client id:
@@ -161,8 +163,9 @@ It is answered with an access token that lasts an hour and a refresh token:
 ```
 
 A code is used up by the trade. A code posted with a verifier that does not match its challenge,
-with another redirect address, a second time, or more than ten minutes after it was made is
-answered with status 400 and `invalid_grant`, and gives no token.
+with another client id or redirect address, a second time, or more than ten minutes after it was
+made is answered with status 400, `invalid_grant` and a description, and gives no token. A code
+posted a second time also stops the access and refresh tokens already issued from it.
 
 When the access token expires, the client posts its refresh token and client id to the same
 address:
@@ -173,8 +176,14 @@ grant_type=refresh_token&refresh_token=<refresh token>&client_id=<client id>
 
 It is answered the same way, with a new access token and a new refresh token, and the refresh
 token it posted stops working. A refresh token posted by a client other than the one it was
-issued to, one already traded, or one unused for ninety days is answered with status 400 and
-`invalid_grant`, and the person signs in again.
+issued to, one already traded, or one unused for ninety days is answered with status 400,
+`invalid_grant` and a description, and the person signs in again. Any other `grant_type` is
+answered with `unsupported_grant_type`, and a body that cannot be read with `invalid_request`.
+
+An unexpected error at the registration or token address or a discovery document is answered
+with status 500 and `server_error`, and on the approval page with an error page. Its message is
+never sent to the client or shown to the person. It is reported to the host app's error
+reporting through `Rails.error`.
 
 The client then sends the token on every request to the endpoint as `Authorization: Bearer
 <token>`. The host's own sign-in, the base controller the endpoint inherits from, asks the gem

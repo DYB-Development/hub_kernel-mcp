@@ -13,3 +13,12 @@ if ActiveSupport::TestCase.respond_to?(:fixture_paths=)
   ActiveSupport::TestCase.file_fixture_path = File.expand_path("fixtures", __dir__) + "/files"
   ActiveSupport::TestCase.fixtures :all
 end
+
+class ActiveSupport::TestCase
+  def while_failing(target, method_name)
+    target.singleton_class.define_method(method_name) { |*| raise "the database password is hunter2" }
+    yield
+  ensure
+    target.singleton_class.remove_method(method_name)
+  end
+end

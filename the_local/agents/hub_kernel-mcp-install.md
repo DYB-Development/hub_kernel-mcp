@@ -31,13 +31,14 @@ a signed-in person's behalf.
 - `mount HubKernel::Mcp::Discovery` — mounts the two OAuth discovery documents
   in the host's `config/routes.rb`. It must be mounted at `"/.well-known"`,
   since the endpoint's 401 header names that path.
-- `bin/rails hub_kernel_mcp:install:migrations` — copies the gem's five
+- `bin/rails hub_kernel_mcp:install:migrations` — copies the gem's six
   migrations into the host's `db/migrate`. They create the
   `hub_kernel_mcp_clients` table, which holds each client that registers, the
   `hub_kernel_mcp_authorization_codes` table, which holds each code the
   approval page issues, and the `hub_kernel_mcp_connections` table, which holds
-  each access token issued for a code, and then add the refresh token's columns
-  and a `last_used_at` column to `hub_kernel_mcp_connections`.
+  each access token issued for a code, and then add the refresh token's columns,
+  a `last_used_at` column and an indexed `code_digest` column to
+  `hub_kernel_mcp_connections`.
 - `HubKernel::Mcp.base_controller=` — the name, as a String, of the host
   controller the endpoint inherits from. Its before-actions, including sign-in,
   run before any hub is asked. Defaults to `"ActionController::API"`, which has
@@ -183,9 +184,10 @@ a signed-in person's behalf.
    bin/rails hub_kernel_mcp:install:migrations db:migrate
    ```
 
-   This adds five migrations to the host's `db/migrate` and the
+   This adds six migrations to the host's `db/migrate` and the
    `hub_kernel_mcp_clients`, `hub_kernel_mcp_authorization_codes` and
-   `hub_kernel_mcp_connections` tables to `db/schema.rb`. Commit all six files.
+   `hub_kernel_mcp_connections` tables to `db/schema.rb`. Commit all seven
+   files.
 
 10. Add the discovery mount to `config/routes.rb`, at the site root beside the
     endpoint's mount, at exactly `"/.well-known"`:
@@ -285,19 +287,25 @@ a signed-in person's behalf.
   `<host>/.well-known/oauth-protected-resource/mcp`, and a GET to that address
   should name the endpoint.
 - With the approval page installed, open `<host>/mcp/authorize` in a browser
-  while signed out: the host's sign-in should take over. Signed in, a request
-  with no registered client and redirect address shows a page saying the app
-  asked to send the person to an address it did not register.
+  while signed out: the host's sign-in should take over. Signed in, the same
+  address with no query shows a page saying
+  `The approval request is missing client_id`.
 - With the token lookup installed, check it with
   `bin/rails runner "p HubKernel::Mcp::Connection.person_for('unknown')"`,
   which should print `nil`, and with `curl -i -X POST <host>/mcp` carrying
   `Authorization: Bearer unknown`, which should answer 401.
 - Run `bin/rails hub_kernel_mcp:install:migrations` again after upgrading the
   gem, then `db:migrate`. It copies only migrations the host does not have yet.
-  A host that installed an earlier version with fewer than five migrations gets
-  the missing ones this way. Until they are run, the token address answers with
-  an error, or the token lookup and the connections list fail on the missing
-  `last_used_at` column.
+  A host that installed an earlier version with fewer than six migrations gets
+  the missing ones this way. Until they are run, the token address answers
+  status 500 with `server_error`, or the token lookup and the connections list
+  fail on the missing `last_used_at` column.
+- An unexpected error at the registration address, the token address, a
+  discovery document or the approval page is reported to the host's error
+  reporting through `Rails.error`, and its message is never sent to the client
+  or shown to the person. When a client reports `server_error` or the approval
+  page says `Signing in failed unexpectedly`, read the host's error reporting
+  for the cause.
 - With the connections section installed, sign in and open the settings page:
   each app approved as that person is listed, a connection whose token has not
   been looked up since the `last_used_at` migration ran shows `Never used`, and

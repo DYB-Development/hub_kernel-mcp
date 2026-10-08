@@ -21,4 +21,12 @@ class DiscoveryTest < ActionDispatch::IntegrationTest
       "code_challenge_methods_supported" => [ "S256" ]
     }, response.parsed_body)
   end
+
+  test "an unexpected error at a discovery document is reported without its message reaching the client" do
+    reports = while_failing(HubKernel::Mcp::Engine.routes, :find_script_name) do
+      capture_error_reports { get "/.well-known/oauth-protected-resource/mcp" }
+    end
+
+    assert_equal [ [ RuntimeError ], 500, { "error" => "server_error", "error_description" => "The sign-in failed unexpectedly" } ], [ reports.map { |report| report.error.class }, response.status, response.parsed_body ]
+  end
 end
