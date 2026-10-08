@@ -13,4 +13,16 @@ class TokenTest < ActionDispatch::IntegrationTest
     answer = response.parsed_body
     assert_equal [ 200, "Bearer", 3600, HubKernel::Mcp::Connection.sole.token_digest ], [ response.status, answer["token_type"], answer["expires_in"], HubKernel::Mcp::Connection.digest(answer["access_token"].to_s) ]
   end
+
+  test "a code posted with a verifier that does not match its challenge is refused and gives no token" do
+    post "/mcp/token", params: @exchange.merge(code_verifier: "another-verifier")
+
+    assert_refused
+  end
+
+  private
+
+  def assert_refused
+    assert_equal [ 400, { "error" => "invalid_grant" }, 0 ], [ response.status, response.parsed_body, HubKernel::Mcp::Connection.count ]
+  end
 end
