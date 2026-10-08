@@ -12,4 +12,10 @@ class RegistrationTest < ActionDispatch::IntegrationTest
 
     assert_equal [ 400, { "error" => "invalid_redirect_uri", "error_description" => "http://claude.ai/callback is neither HTTPS nor on the client's own machine" } ], [ response.status, response.parsed_body ]
   end
+
+  test "a registration whose body is not valid JSON is answered with the OAuth error and why" do
+    post "/mcp/register", params: "{", headers: { "Content-Type" => "application/json" }
+
+    assert_equal [ 400, { "error" => "invalid_client_metadata", "error_description" => "The registration body is not valid JSON" } ], [ response.status, response.parsed_body ]
+  end
 end
