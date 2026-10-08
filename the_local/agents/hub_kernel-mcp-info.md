@@ -1,8 +1,8 @@
 ---
 name: hub_kernel-mcp-info
-description: Use to learn what hub_kernel-mcp offers — serving a host's hubs as MCP tools, how tools are named and scoped, how a client such as Claude's connector screen finds the endpoint's sign-in, registers itself, is approved by a person through the browser and trades its code for an access token, how the host's sign-in finds the person a token acts for, and the vocabulary the install and develop locals assume.
+description: Use to learn what hub_kernel-mcp offers — serving a host's hubs as MCP tools, how tools are named and scoped, how a client such as Claude's connector screen finds the endpoint's sign-in, registers itself, is approved by a person through the browser, trades its code for an access token and a refresh token and later trades the refresh token for a new pair, how the host's sign-in finds the person a token acts for, and the vocabulary the install and develop locals assume.
 tools: Read
-scope: hub MCP tools — serving the methods every hub a host serves, from hub_kernel-interface's one served list, as MCP tools at one JSON-RPC endpoint in a host Rails app, each call behind the host's own sign-in and hub_kernel-interface's permission check and account scope, with a boot check for hubs that cannot be served as tools, the OAuth discovery documents, 401 challenge and client registration that let a client such as Claude's connector screen find the endpoint's sign-in and register by itself, and the approval page where a person signed in to the host through the browser approves that client and is issued an authorization code, the token exchange that trades that code with its PKCE verifier for an access token lasting an hour, and the lookup a host's sign-in calls to get the person a bearer token acts for
+scope: hub MCP tools — serving the methods every hub a host serves, from hub_kernel-interface's one served list, as MCP tools at one JSON-RPC endpoint in a host Rails app, each call behind the host's own sign-in and hub_kernel-interface's permission check and account scope, with a boot check for hubs that cannot be served as tools, the OAuth discovery documents, 401 challenge and client registration that let a client such as Claude's connector screen find the endpoint's sign-in and register by itself, and the approval page where a person signed in to the host through the browser approves that client and is issued an authorization code, the token exchange that trades that code with its PKCE verifier for an access token lasting an hour and a refresh token, the refresh exchange that trades a refresh token for a new access token and a new refresh token and retires the one posted, and the lookup a host's sign-in calls to get the person a bearer token acts for
 ---
 
 This local explains hub_kernel-mcp and makes no changes.
@@ -30,10 +30,12 @@ client registers itself there with its name and redirect addresses. The client
 then sends the person to an approval page in the host, where they sign in
 through the host's usual browser sign-in and approve or deny the client. An
 approval gives the client an authorization code, which it trades at the token
-address for an access token lasting an hour. The client sends that token on
-every request, and the host's sign-in asks the gem which person the token acts
-for. A person using Claude's connector screen only pastes the endpoint's
-address.
+address for an access token lasting an hour and a refresh token. When the
+access token runs out, the client trades the refresh token at the same address
+for a new pair, so the person does not approve the client again. The client
+sends the access token on every request, and the host's sign-in asks the gem
+which person the token acts for. A person using Claude's connector screen only
+pastes the endpoint's address.
 
 ## Interface
 
@@ -45,8 +47,9 @@ This local declares no entry points of its own.
   running the boot check, and calling the token lookup from the host's sign-in
   are owned by the install local, `hub_kernel-mcp-install`.
 - The endpoint itself, the MCP requests it answers, the discovery documents,
-  the challenge on a refused request, client registration, the approval page and
-  the token exchange are owned by the develop local, `hub_kernel-mcp-develop`.
+  the challenge on a refused request, client registration, the approval page,
+  the token exchange and the refresh exchange are owned by the develop local,
+  `hub_kernel-mcp-develop`.
 
 ## How to use it
 
@@ -57,8 +60,8 @@ This local declares no entry points of its own.
 - To change what the endpoint answers, add support for another MCP request,
   change how tools are listed, called or refused, change what the discovery
   documents and registration say, change what the approval page checks and
-  shows, or change when a code is traded for a token and how long the token
-  lasts, use `hub_kernel-mcp-develop`.
+  shows, change when a code or a refresh token is traded for new tokens, or
+  change how long either token lasts, use `hub_kernel-mcp-develop`.
 - To decide which hubs are served at all, or to change permissions and account
   scope, work in hub_kernel-interface, which owns the served list and those
   checks.
@@ -90,7 +93,8 @@ This local declares no entry points of its own.
 - **Discovery documents** — two OAuth documents served at the site root. The
   resource document names the endpoint's address and its sign-in, which is the
   site root. The sign-in document names the registration, approval and token
-  addresses under the endpoint's address, and requires PKCE with SHA-256 and no
+  addresses under the endpoint's address, names the authorization code and
+  refresh grants as the ones it accepts, and requires PKCE with SHA-256 and no
   client secret.
 - **Client and registration** — a client is an app that registered itself by
   posting its name and redirect addresses, and is answered with a client id.
@@ -110,16 +114,24 @@ This local declares no entry points of its own.
   address, along with the client's state. It is tied to the person, the client,
   the redirect address and the PKCE challenge, lasts ten minutes, and only a
   digest of it is stored.
-- **Token exchange** — the client posts its code, its redirect address and its
-  PKCE verifier to the token address, with no sign-in. A code that is unknown,
-  expired, already traded, sent with a different redirect address or with a
-  verifier that does not match is refused as an invalid grant. A code is traded
-  once and then cannot be traded again.
-- **Access token and connection** — what a traded code is answered with: a
-  bearer token that lasts an hour, with no refresh token. Each one is stored as
-  a connection tying the person and the client to a digest of the token, so the
-  token itself is never stored.
+- **Token exchange** — the client posts its client id, its code, its redirect
+  address and its PKCE verifier to the token address, with no sign-in. A code
+  that is unknown, expired, already traded, issued to another client, sent with
+  a different redirect address or with a verifier that does not match is refused
+  as an invalid grant. A code is traded once and then cannot be traded again.
+- **Access token, refresh token and connection** — what a traded code is
+  answered with: a bearer access token that lasts an hour and a refresh token
+  that lasts ninety days. The pair is stored as a connection tying the person
+  and the client to a digest of each token, so neither token itself is stored.
+- **Refresh exchange** — the client posts its client id and its refresh token to
+  the token address, asking for the refresh grant, with no sign-in. It is
+  answered with a new access token and a new refresh token on the same
+  connection, and the new refresh token lasts another ninety days. The refresh
+  token posted and the access token it was issued with both stop working. A
+  refresh token that is unknown, already used, issued to another client, or
+  unused for ninety days is refused as an invalid grant, and of two refreshes
+  posting the same token at once only one succeeds.
 - **Token lookup** — what the host's sign-in calls with the bearer token from a
-  request. It gives the person the token acts for while the token is unexpired,
-  and nothing for an expired or unknown token. The account a call is made in
-  still comes from the host's account method.
+  request. It gives the person the access token acts for while the token is
+  unexpired, and nothing for an expired, replaced or unknown token. The account
+  a call is made in still comes from the host's account method.

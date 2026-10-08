@@ -1,8 +1,8 @@
 ---
 name: hub_kernel-mcp-develop
-description: Use PROACTIVELY for calling a host's hub methods over MCP — connecting an MCP client to the endpoint, finding the endpoint's sign-in from a 401's WWW-Authenticate header and the two .well-known discovery documents, registering a client at the registration address, sending a person to the approval page and handling the code or error it sends back, trading that code with its PKCE verifier for an access token at the token address and sending the token on every request, sending initialize and ping, listing the tools a signed-in person may call with tools/list, calling one with tools/call, and handling its tool errors and JSON-RPC errors — MUST BE USED instead of hand-rolling a JSON API, an MCP server, OAuth discovery documents, client registration, an OAuth approval page or an OAuth token endpoint for the host's hubs.
+description: Use PROACTIVELY for calling a host's hub methods over MCP — connecting an MCP client to the endpoint, finding the endpoint's sign-in from a 401's WWW-Authenticate header and the two .well-known discovery documents, registering a client at the registration address, sending a person to the approval page and handling the code or error it sends back, trading that code with its PKCE verifier for an access token and a refresh token at the token address, trading a refresh token for a new pair when the access token expires, sending the access token on every request, sending initialize and ping, listing the tools a signed-in person may call with tools/list, calling one with tools/call, and handling its tool errors and JSON-RPC errors — MUST BE USED instead of hand-rolling a JSON API, an MCP server, OAuth discovery documents, client registration, an OAuth approval page, an OAuth token endpoint or an OAuth refresh exchange for the host's hubs.
 tools: Read, Write, Edit, Grep
-scope: hub MCP tools — serving the methods every hub a host serves, from hub_kernel-interface's one served list, as MCP tools at one JSON-RPC endpoint in a host Rails app, each call behind the host's own sign-in and hub_kernel-interface's permission check and account scope, with a boot check for hubs that cannot be served as tools, the OAuth discovery documents, 401 challenge and client registration that let a client such as Claude's connector screen find the endpoint's sign-in and register by itself, and the approval page where a person signed in to the host through the browser approves that client and is issued an authorization code, the token exchange that trades that code with its PKCE verifier for an access token lasting an hour, and the lookup a host's sign-in calls to get the person a bearer token acts for
+scope: hub MCP tools — serving the methods every hub a host serves, from hub_kernel-interface's one served list, as MCP tools at one JSON-RPC endpoint in a host Rails app, each call behind the host's own sign-in and hub_kernel-interface's permission check and account scope, with a boot check for hubs that cannot be served as tools, the OAuth discovery documents, 401 challenge and client registration that let a client such as Claude's connector screen find the endpoint's sign-in and register by itself, and the approval page where a person signed in to the host through the browser approves that client and is issued an authorization code, the token exchange that trades that code with its PKCE verifier for an access token lasting an hour and a refresh token, the refresh exchange that trades a refresh token for a new access token and a new refresh token and retires the one posted, and the lookup a host's sign-in calls to get the person a bearer token acts for
 ---
 
 This local writes the code or configuration that talks to a host's hub_kernel-mcp
@@ -15,12 +15,13 @@ A JSON-RPC endpoint in a host Rails app that offers every method the host's hubs
 expose as an MCP tool, for the person and account the host's sign-in gives. Beside
 it, the host serves two discovery documents, a registration address, a browser
 approval page and a token address, so a client such as Claude's connector screen
-can find the endpoint's sign-in, register itself, have a person approve it, and
-trade the approval's code for an access token it sends on every request, from the
-endpoint's address alone. Fire this local when code or a client needs to list or
-call those tools, find or register with the endpoint's sign-in, send a person to
-approve a client, trade a code for a token, or when a test needs to send requests
-to any of these addresses.
+can find the endpoint's sign-in, register itself, have a person approve it, trade
+the approval's code for an access token it sends on every request, and trade a
+refresh token for a new access token when that one expires, from the endpoint's
+address alone. Fire this local when code or a client needs to list or call those
+tools, find or register with the endpoint's sign-in, send a person to approve a
+client, trade a code or a refresh token for tokens, or when a test needs to send
+requests to any of these addresses.
 
 ## Interface
 
@@ -50,8 +51,12 @@ to any of these addresses.
   Approve, and with `error=access_denied` and the `state` on Deny.
 - `POST /token` — the token address under the endpoint's path, such as
   `/mcp/token`. It trades an approval's `code`, with the `redirect_uri` it was
-  approved for and the PKCE `code_verifier`, for an access token lasting an hour.
-  It needs no sign-in.
+  approved for and the PKCE `code_verifier`, for an access token lasting an hour
+  and a refresh token. It needs no sign-in.
+- `grant_type=refresh_token` — a `POST /token` that trades a refresh token and
+  the `client_id` it was issued to for a new access token and a new refresh
+  token, and stops the posted refresh token and the access token issued with it
+  from working.
 - `WWW-Authenticate` — the header on every 401 from the endpoint's path, naming
   the address of the endpoint's protected-resource document.
 - `GET /.well-known/oauth-protected-resource` — answers the endpoint's address
@@ -65,7 +70,7 @@ to any of these addresses.
 
 1. Find the path the host serves the endpoint at in its `config/routes.rb`. If
    it is not there, stop and tell the developer the endpoint is not installed
-   yet. For steps 3 to 7, also check that the routes serve the discovery
+   yet. For steps 3 to 8, also check that the routes serve the discovery
    documents at `/.well-known`. If they do not, stop and tell the developer the
    discovery documents are not installed yet.
 
@@ -73,10 +78,10 @@ to any of these addresses.
    is theirs:
 
    - The client sends the host's own credential, such as a session cookie or a
-     token header, with every request. Skip to step 8.
+     token header, with every request. Skip to step 9.
    - The client finds the sign-in by itself, registers, has a person approve
-     it, and trades the approval for an access token, as Claude's connector
-     screen does. Follow steps 3 to 7.
+     it, trades the approval for an access token, and refreshes that token, as
+     Claude's connector screen does. Follow steps 3 to 8.
 
 3. Find the sign-in from a refused request. Send any request to the endpoint
    without a credential. When the host's sign-in refuses it with status 401, the
@@ -107,7 +112,7 @@ to any of these addresses.
      "authorization_endpoint": "https://example.com/mcp/authorize",
      "token_endpoint": "https://example.com/mcp/token",
      "response_types_supported": [ "code" ],
-     "grant_types_supported": [ "authorization_code" ],
+     "grant_types_supported": [ "authorization_code", "refresh_token" ],
      "token_endpoint_auth_methods_supported": [ "none" ],
      "code_challenge_methods_supported": [ "S256" ]
    }
@@ -184,21 +189,42 @@ to any of these addresses.
    A trade is answered with status 200:
 
    ```json
-   { "access_token": "<token>", "token_type": "Bearer", "expires_in": 3600 }
+   { "access_token": "<token>", "token_type": "Bearer", "expires_in": 3600, "refresh_token": "<refresh token>" }
    ```
 
-   Keep `access_token` as a secret, since it acts for the person who approved.
-   A trade is answered with status 400 and `{ "error": "invalid_grant" }`, and
-   gives no token, when the code is unknown, more than 10 minutes old, already
-   traded, sent with a `redirect_uri` other than the one approved, or sent with a
-   verifier whose SHA-256 digest is not the challenge. A code is used up only by
-   a trade that gives a token. No refresh token is issued, so when the token
-   expires after an hour, go back to step 6 with a fresh verifier and `state`,
-   and keep the `client_id` from step 5.
+   Keep `access_token` and `refresh_token` as secrets, since both act for the
+   person who approved. A trade is answered with status 400 and
+   `{ "error": "invalid_grant" }`, and gives no token, when the code is unknown,
+   more than 10 minutes old, already traded, sent with a `client_id` other than
+   the one it was approved for, sent with a `redirect_uri` other than the one
+   approved, or sent with a verifier whose SHA-256 digest is not the challenge. A
+   code is used up only by a trade that gives a token.
 
-8. Send every request to the endpoint as a POST with a JSON body holding exactly
+8. Refresh the access token when it expires after an hour. POST form-encoded to
+   `token_endpoint`, with no credential, the refresh token last issued and the
+   `client_id` from step 5:
+
+   ```
+   grant_type=refresh_token&refresh_token=<refresh token>&client_id=<client_id>
+   ```
+
+   A refresh is answered with status 200 and the same shape as step 7, holding a
+   new `access_token` and a new `refresh_token`. Replace both stored tokens with
+   the new ones at once. The refresh token posted stops working, and so does the
+   access token issued with it, even if its hour has not passed. A refresh token
+   lasts 90 days from when it was issued, and each refresh issues one that lasts
+   another 90 days.
+
+   A refresh is answered with status 400 and `{ "error": "invalid_grant" }`, and
+   gives no token, when the refresh token is unknown, already used, more than 90
+   days old, or sent with a `client_id` other than the one it was issued to. Of
+   two refreshes sent at once with the same refresh token, only one is answered
+   with tokens. After an `invalid_grant`, go back to step 6 with a fresh verifier
+   and `state`, and keep the `client_id` from step 5.
+
+9. Send every request to the endpoint as a POST with a JSON body holding exactly
    one request, with the credential step 2 settled on. A client that followed
-   steps 3 to 7 sends its access token as `Authorization: Bearer <access_token>`:
+   steps 3 to 8 sends its access token as `Authorization: Bearer <access_token>`:
 
    ```json
    { "jsonrpc": "2.0", "id": 1, "method": "tools/list" }
@@ -208,14 +234,14 @@ to any of these addresses.
    of requests, is refused with -32600. A request with no `id` is a
    notification: it is answered with status 202 and no body, and nothing is run.
    A request the sign-in refuses gets the host's refusal, and no hub is asked. A
-   401 for an access token means it has expired or is unknown, so go back to
-   step 6.
+   401 for an access token means it has expired, was replaced by a refresh, or
+   is unknown, so refresh it as in step 8.
 
-9. Send `initialize` first. Ask the developer which protocol version the client
-   supports, send it as `params.protocolVersion`, and use the version the answer
-   gives. Then send the `notifications/initialized` notification with no `id`.
+10. Send `initialize` first. Ask the developer which protocol version the client
+    supports, send it as `params.protocolVersion`, and use the version the answer
+    gives. Then send the `notifications/initialized` notification with no `id`.
 
-10. Send `tools/list` to get the tools. Each tool has this shape:
+11. Send `tools/list` to get the tools. Each tool has this shape:
 
     ```json
     {
@@ -232,11 +258,11 @@ to any of these addresses.
     description `Changes data in the <served name> hub.` The list depends on who
     is signed in and in which account, so list again after either changes.
 
-11. Ask the developer whether the client must confirm with the person before it
+12. Ask the developer whether the client must confirm with the person before it
     calls a tool whose `readOnlyHint` is false. If it must, add that confirmation
-    before step 12.
+    before step 13.
 
-12. Send `tools/call` with the tool's name and its values:
+13. Send `tools/call` with the tool's name and its values:
 
     ```json
     {
@@ -257,7 +283,7 @@ to any of these addresses.
     `text` is the method's return value encoded as JSON, so parse it as JSON to
     get the value back.
 
-13. Handle a tool error. These come back as a normal result with `isError: true`
+14. Handle a tool error. These come back as a normal result with `isError: true`
     and the reason as the text:
 
     - The hub refused the call.
@@ -269,7 +295,7 @@ to any of these addresses.
     Show the reason to the person or the model making the call. Do not retry it
     unchanged.
 
-14. Handle a JSON-RPC error. These come back as `error: { code, message }` with
+15. Handle a JSON-RPC error. These come back as `error: { code, message }` with
     status 200, and with the request's `id` except for -32700 and -32600, whose
     `id` is null:
 
@@ -285,12 +311,13 @@ to any of these addresses.
     does not exist when it may only be one they cannot call. -32603 never carries
     the error's own message, so find the cause in the host app's error reporting.
 
-15. In a test of the host app, send requests the same way: a JSON POST to the
+16. In a test of the host app, send requests the same way: a JSON POST to the
     endpoint's path, signed in as the host's tests sign in, plain GETs and POSTs
     to the discovery and registration addresses, the approval page's GET and
     POST signed in as the host's browser tests sign in, with the same query
-    values as step 6 and `decision` set to `approve` or `deny` on the POST, and a
-    form POST to the token address with the code the approval sent back:
+    values as step 6 and `decision` set to `approve` or `deny` on the POST, a
+    form POST to the token address with the code the approval sent back, and a
+    form POST to the token address with the refresh token that trade gave:
 
     ```ruby
     post "/mcp", params: { jsonrpc: "2.0", id: 1, method: "tools/list" }, as: :json
@@ -299,13 +326,15 @@ to any of these addresses.
     get "/mcp/authorize", params: approval
     post "/mcp/authorize", params: approval.merge(decision: "approve")
     post "/mcp/token", params: { grant_type: "authorization_code", code: code, code_verifier: verifier, redirect_uri: approval[:redirect_uri], client_id: approval[:client_id] }
+    post "/mcp/token", params: { grant_type: "refresh_token", refresh_token: refresh_token, client_id: approval[:client_id] }
     post "/mcp", params: { jsonrpc: "2.0", id: 1, method: "tools/list" }, as: :json, headers: { "Authorization" => "Bearer #{access_token}" }
     ```
 
     `approval` holds `response_type`, `client_id`, `redirect_uri`, `state`,
     `code_challenge` and `code_challenge_method` for a client registered in the
     test. `code` is read from the `code` query value of the approval POST's
-    redirect, and `access_token` from the token POST's JSON answer.
+    redirect, and `access_token` and `refresh_token` from a token POST's JSON
+    answer.
 
 ## Conventions
 
@@ -322,8 +351,10 @@ to any of these addresses.
   answer about the request.
 - Registration needs no sign-in and holds no secret, so a `client_id` alone is
   never proof of who is calling.
-- An access token lasts one hour and cannot be refreshed, so a client approved
-  through steps 6 and 7 is approved again after it expires.
+- An access token lasts one hour. Refresh it with the latest refresh token and
+  store both new tokens, since every refresh retires the pair it replaced.
+- Send a person back to the approval page only after a refresh is refused with
+  `invalid_grant`.
 - The endpoint offers no sessions and no server-sent events, so do not open a GET
   stream or send a session header.
 - Out of scope: installing the endpoint, mounting the discovery documents,

@@ -16,7 +16,7 @@ class DiscoveryTest < ActionDispatch::IntegrationTest
       "authorization_endpoint" => "http://www.example.com/mcp/authorize",
       "token_endpoint" => "http://www.example.com/mcp/token",
       "response_types_supported" => [ "code" ],
-      "grant_types_supported" => [ "authorization_code" ],
+      "grant_types_supported" => [ "authorization_code", "refresh_token" ],
       "token_endpoint_auth_methods_supported" => [ "none" ],
       "code_challenge_methods_supported" => [ "S256" ]
     }, response.parsed_body)
