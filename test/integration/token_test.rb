@@ -26,6 +26,13 @@ class TokenTest < ActionDispatch::IntegrationTest
     assert_refused
   end
 
+  test "a code used a second time is refused and gives no second token" do
+    post "/mcp/token", params: @exchange
+    post "/mcp/token", params: @exchange
+
+    assert_equal [ 400, { "error" => "invalid_grant" }, 1 ], [ response.status, response.parsed_body, HubKernel::Mcp::Connection.count ]
+  end
+
   private
 
   def assert_refused
