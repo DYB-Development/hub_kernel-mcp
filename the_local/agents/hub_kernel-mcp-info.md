@@ -1,8 +1,8 @@
 ---
 name: hub_kernel-mcp-info
-description: Use to learn what hub_kernel-mcp offers — serving a host's hubs as MCP tools, how tools are named and scoped, how a client such as Claude's connector screen finds the endpoint's sign-in and registers itself, and the vocabulary the install and develop locals assume.
+description: Use to learn what hub_kernel-mcp offers — serving a host's hubs as MCP tools, how tools are named and scoped, how a client such as Claude's connector screen finds the endpoint's sign-in, registers itself and is approved by a person through the browser, and the vocabulary the install and develop locals assume.
 tools: Read
-scope: hub MCP tools — serving the methods every hub a host serves, from hub_kernel-interface's one served list, as MCP tools at one JSON-RPC endpoint in a host Rails app, each call behind the host's own sign-in and hub_kernel-interface's permission check and account scope, with a boot check for hubs that cannot be served as tools, and the OAuth discovery documents, 401 challenge and client registration that let a client such as Claude's connector screen find the endpoint's sign-in and register by itself
+scope: hub MCP tools — serving the methods every hub a host serves, from hub_kernel-interface's one served list, as MCP tools at one JSON-RPC endpoint in a host Rails app, each call behind the host's own sign-in and hub_kernel-interface's permission check and account scope, with a boot check for hubs that cannot be served as tools, the OAuth discovery documents, 401 challenge and client registration that let a client such as Claude's connector screen find the endpoint's sign-in and register by itself, and the approval page where a person signed in to the host through the browser approves that client and is issued an authorization code
 ---
 
 This local explains hub_kernel-mcp and makes no changes.
@@ -20,33 +20,39 @@ wants an assistant to read or change that data on a person's behalf. Every call
 passes through the host's own sign-in first, then hub_kernel-interface's
 permission check and account scope, so a tool can do nothing the signed-in
 person could not already do. A boot check refuses to start a host whose served
-hubs cannot be turned into valid tool names.
+hubs cannot be turned into valid tool names, or whose browser settings for the
+approval page are not all set.
 
 The gem also lets a client set itself up from the endpoint's address alone. A
 refused request tells the client where the endpoint is described, two discovery
 documents name the endpoint's sign-in and its registration address, and the
-client registers itself there with its name and redirect addresses. A person
-using Claude's connector screen only pastes the endpoint's address.
+client registers itself there with its name and redirect addresses. The client
+then sends the person to an approval page in the host, where they sign in
+through the host's usual browser sign-in and approve or deny the client. A
+person using Claude's connector screen only pastes the endpoint's address.
 
 ## Interface
 
 This local declares no entry points of its own.
 
 - Adding the gem to a host, mounting the endpoint and the discovery documents,
-  installing the client table, configuring which controller and which person
-  and account methods it uses, and running the boot check are owned by the
-  install local, `hub_kernel-mcp-install`.
+  installing the client and authorization code tables, configuring which
+  controllers, person, account and sign-in methods and layout it uses, and
+  running the boot check are owned by the install local,
+  `hub_kernel-mcp-install`.
 - The endpoint itself, the MCP requests it answers, the discovery documents,
-  the challenge on a refused request, and client registration are owned by the
-  develop local, `hub_kernel-mcp-develop`.
+  the challenge on a refused request, client registration and the approval page
+  are owned by the develop local, `hub_kernel-mcp-develop`.
 
 ## How to use it
 
 - To put hub_kernel-mcp into a Rails app, to let a connector screen sign in to
-  it, or to fix a host whose boot check fails, use `hub_kernel-mcp-install`.
+  it, to point the approval page at the host's browser sign-in and layout, or to
+  fix a host whose boot check fails, use `hub_kernel-mcp-install`.
 - To change what the endpoint answers, add support for another MCP request,
-  change how tools are listed, called or refused, or change what the discovery
-  documents and registration say, use `hub_kernel-mcp-develop`.
+  change how tools are listed, called or refused, change what the discovery
+  documents and registration say, or change what the approval page checks and
+  shows, use `hub_kernel-mcp-develop`.
 - To decide which hubs are served at all, or to change permissions and account
   scope, work in hub_kernel-interface, which owns the served list and those
   checks.
@@ -85,6 +91,19 @@ This local declares no entry points of its own.
   Every redirect address must be HTTPS, or plain HTTP on the client's own
   machine, and a registration with none or with any other address is refused
   with the reason.
-- **Approval and token addresses** — the sign-in document names them, but this
-  gem does not answer them yet, so a registered client cannot finish signing in
+- **Browser side** — the approval page runs on a host controller meant for
+  people in a browser, separate from the endpoint's controller. The host names
+  that controller, the method that makes a person sign in, the method that
+  returns the signed-in person, and the layout the page renders in.
+- **Approval page** — shows which client wants to connect as the signed-in
+  person, with an approve and a deny button. A redirect address the client did
+  not register gets an error page and nothing is sent to that address. A request
+  without a SHA-256 PKCE challenge is sent back to the client as an invalid
+  request. A denial is sent back to the client as access denied.
+- **Authorization code** — what an approval sends back to the client's redirect
+  address, along with the client's state. It is tied to the person, the client,
+  the redirect address and the PKCE challenge, lasts ten minutes, and only a
+  digest of it is stored.
+- **Token address** — the sign-in document names it, but this gem does not
+  answer it yet, so a client cannot exchange its authorization code for a token
   through this gem alone.

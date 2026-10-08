@@ -75,6 +75,20 @@ naming a hub the host does not serve are all answered with the same JSON-RPC err
 
 A caller the host's sign-in refuses is refused before any hub is asked.
 
+A `ping` is answered with an empty result. Every other request the endpoint cannot answer gets
+a JSON-RPC error:
+
+| Request | Code | Message |
+|---|---|---|
+| A body that is not valid JSON | -32700 | `Parse error` |
+| A body that is not one JSON-RPC request, such as a batch | -32600 | `Invalid Request` |
+| An MCP method the endpoint does not support | -32601 | `Method not found: <method>` |
+| An unexpected error inside a hub method | -32603 | `Internal error` |
+
+An unexpected error's own message is never sent to the client. It is reported to the host
+app's error reporting through `Rails.error`. A GET to the endpoint's address is answered with
+status 405, since the endpoint offers no sessions or server-sent events.
+
 ## Signing in from a connector screen
 
 A client such as Claude's connector screen finds the endpoint's sign-in by itself and
@@ -112,19 +126,27 @@ It is answered with status 201 and a client id. A registration with no redirect 
 with one that is neither HTTPS nor on the client's own machine, is answered with status 400,
 `invalid_redirect_uri`, and the reason.
 
-A `ping` is answered with an empty result. Every other request the endpoint cannot answer gets
-a JSON-RPC error:
+The approval address is a browser page. It runs inside a controller of the host's, so the
+host's own sign-in decides who is approving. Name that controller, the method on it that signs a
+person in, the method that gives the signed-in person, and the layout the page is shown in:
 
-| Request | Code | Message |
-|---|---|---|
-| A body that is not valid JSON | -32700 | `Parse error` |
-| A body that is not one JSON-RPC request, such as a batch | -32600 | `Invalid Request` |
-| An MCP method the endpoint does not support | -32601 | `Method not found: <method>` |
-| An unexpected error inside a hub method | -32603 | `Internal error` |
+```ruby
+HubKernel::Mcp.browser_controller = "ApplicationController"
+HubKernel::Mcp.sign_in_method = :authenticate_user!
+HubKernel::Mcp.browser_person_method = :current_user
+HubKernel::Mcp.browser_layout = "application"
+```
 
-An unexpected error's own message is never sent to the client. It is reported to the host
-app's error reporting through `Rails.error`. A GET to the endpoint's address is answered with
-status 405, since the endpoint offers no sessions or server-sent events.
+`HubKernel::Mcp.check!` names each of the four a host has not set. The person the page gives is
+kept by its global id, so it must be a record that has one.
+
+A person who is not signed in is sent through the host's sign-in. A signed-in person sees the
+name of the app asking to connect, with an Approve and a Deny button. Approving sends them back
+to the client's redirect address with a code and the
+client's `state`. Denying sends them back with `error=access_denied` and no code. A request
+naming a redirect address the client did not register shows an error page and sends the person
+nowhere. A request with no PKCE challenge, or one whose method is not `S256`, is sent back with
+`error=invalid_request`.
 
 ## Installation
 

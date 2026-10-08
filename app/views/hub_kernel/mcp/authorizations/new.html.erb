@@ -1,0 +1,9 @@
+<h1><%= @client.name %> wants to connect as you</h1>
+
+<%= form_with url: request.path, method: :post do |form| %>
+  <% approval_params.each do |name, value| %>
+    <%= hidden_field_tag name, value %>
+  <% end %>
+  <%= form.button "Approve", name: "decision", value: "approve" %>
+  <%= form.button "Deny", name: "decision", value: "deny" %>
+<% end %>

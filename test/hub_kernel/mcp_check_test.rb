@@ -40,6 +40,17 @@ class McpCheckTest < ActiveSupport::TestCase
     assert_equal "The tool #{"m" * 51}__record_spend is longer than 64 characters", error.message
   end
 
+  test "an approval page setting the host has not set is named" do
+    layout = HubKernel::Mcp.browser_layout
+    HubKernel::Mcp.browser_layout = nil
+
+    error = assert_raises(HubKernel::Mcp::UnservableHubError) { HubKernel::Mcp.check! }
+
+    assert_equal "HubKernel::Mcp.browser_layout is not set", error.message
+  ensure
+    HubKernel::Mcp.browser_layout = layout
+  end
+
   test "a served list with no problem passes the check" do
     HubKernel::Interface.hubs = [ Shop, { "money" => Ledger } ]
 
