@@ -46,6 +46,7 @@ sources:
   - db/migrate/20261009000000_create_hub_kernel_mcp_connections.rb
   - db/migrate/20261009000001_add_refresh_token_to_hub_kernel_mcp_connections.rb
   - db/migrate/20261009000002_add_last_used_at_to_hub_kernel_mcp_connections.rb
+  - db/migrate/20261009000003_add_code_digest_to_hub_kernel_mcp_connections.rb
   - app/models/hub_kernel/mcp/client.rb
   - app/models/hub_kernel/mcp/authorization_code.rb
   - app/models/hub_kernel/mcp/connection.rb
@@ -56,6 +57,6 @@ sources:
   - app/controllers/hub_kernel/mcp/authorizations_controller.rb
   - app/controllers/hub_kernel/mcp/tokens_controller.rb
   - app/views/hub_kernel/mcp/authorizations/new.html.erb
-  - app/views/hub_kernel/mcp/authorizations/unregistered_redirect.html.erb
+  - app/views/hub_kernel/mcp/authorizations/refused.html.erb
   - app/views/hub_kernel/mcp/_connections.html.erb
   - README.md

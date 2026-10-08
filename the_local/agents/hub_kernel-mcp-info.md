@@ -1,6 +1,6 @@
 ---
 name: hub_kernel-mcp-info
-description: Use to learn what hub_kernel-mcp offers — serving a host's hubs as MCP tools, how tools are named and scoped, how a client such as Claude's connector screen finds the endpoint's sign-in, registers itself, is approved by a person through the browser, trades its code for an access token and a refresh token and later trades the refresh token for a new pair, how the host's sign-in finds the person a token acts for, how a person sees and disconnects the apps connected as them, and the vocabulary the install and develop locals assume.
+description: Use to learn what hub_kernel-mcp offers — serving a host's hubs as MCP tools, how tools are named and scoped, how a client such as Claude's connector screen finds the endpoint's sign-in, registers itself, is approved by a person through the browser, trades its code for an access token and a refresh token and later trades the refresh token for a new pair, how each sign-in step refuses a bad request or an unexpected error, how the host's sign-in finds the person a token acts for, how a person sees and disconnects the apps connected as them, and the vocabulary the install and develop locals assume.
 tools: Read
 scope: hub MCP tools — serving the methods every hub a host serves, from hub_kernel-interface's one served list, as MCP tools at one JSON-RPC endpoint in a host Rails app, each call behind the host's own sign-in and hub_kernel-interface's permission check and account scope, with a boot check for hubs that cannot be served as tools, the OAuth discovery documents, 401 challenge and client registration that let a client such as Claude's connector screen find the endpoint's sign-in and register by itself, and the approval page where a person signed in to the host through the browser approves that client and is issued an authorization code, the token exchange that trades that code with its PKCE verifier for an access token lasting an hour and a refresh token, the refresh exchange that trades a refresh token for a new access token and a new refresh token and retires the one posted, and the lookup a host's sign-in calls to get the person a bearer token acts for, which records when the connection was last used, and the settings section a host registers with settings_hub that lists a person's connections with the app's name, when it connected and when it was last used, and disconnects one that is the person's own
 ---
@@ -55,8 +55,9 @@ This local declares no entry points of its own.
   settings_hub are owned by the install local, `hub_kernel-mcp-install`.
 - The endpoint itself, the MCP requests it answers, the discovery documents,
   the challenge on a refused request, client registration, the approval page,
-  the token exchange, the refresh exchange and the query for a person's
-  connections are owned by the develop local, `hub_kernel-mcp-develop`.
+  the token exchange, the refresh exchange, how each of them refuses, and the
+  query for a person's connections are owned by the develop local,
+  `hub_kernel-mcp-develop`.
 
 ## How to use it
 
@@ -68,9 +69,9 @@ This local declares no entry points of its own.
 - To change what the endpoint answers, add support for another MCP request,
   change how tools are listed, called or refused, change what the discovery
   documents and registration say, change what the approval page checks and
-  shows, change when a code or a refresh token is traded for new tokens, or
-  change how long either token lasts, or change which connections count as a
-  person's own, use `hub_kernel-mcp-develop`.
+  shows, change when a code or a refresh token is traded for new tokens, change
+  how long either token lasts, change how a sign-in step refuses, or change
+  which connections count as a person's own, use `hub_kernel-mcp-develop`.
 - To decide which hubs are served at all, or to change permissions and account
   scope, work in hub_kernel-interface, which owns the served list and those
   checks.
@@ -109,16 +110,19 @@ This local declares no entry points of its own.
   posting its name and redirect addresses, and is answered with a client id.
   Every redirect address must be HTTPS, or plain HTTP on the client's own
   machine, and a registration with none or with any other address is refused
-  with the reason.
+  with the reason. A registration body that is not valid JSON is refused as
+  invalid client metadata.
 - **Browser side** — the approval page runs on a host controller meant for
   people in a browser, separate from the endpoint's controller. The host names
   that controller, the method that makes a person sign in, the method that
   returns the signed-in person, and the layout the page renders in.
 - **Approval page** — shows which client wants to connect as the signed-in
-  person, with an approve and a deny button. A redirect address the client did
-  not register gets an error page and nothing is sent to that address. A request
-  without a SHA-256 PKCE challenge is sent back to the client as an invalid
-  request. A denial is sent back to the client as access denied.
+  person, with an approve and a deny button. A request missing its client id or
+  redirect address, naming a client that is not registered, or naming a
+  redirect address the client did not register gets an error page saying which,
+  and nothing is sent to any address. A request without a SHA-256 PKCE
+  challenge is sent back to the client as an invalid request. A denial is sent
+  back to the client as access denied.
 - **Authorization code** — what an approval sends back to the client's redirect
   address, along with the client's state. It is tied to the person, the client,
   the redirect address and the PKCE challenge, lasts ten minutes, and only a
@@ -127,7 +131,10 @@ This local declares no entry points of its own.
   address and its PKCE verifier to the token address, with no sign-in. A code
   that is unknown, expired, already traded, issued to another client, sent with
   a different redirect address or with a verifier that does not match is refused
-  as an invalid grant. A code is traded once and then cannot be traded again.
+  as an invalid grant. A code is traded once. A code posted a second time also
+  stops the access and refresh tokens already issued from it. A grant other than
+  the authorization code and refresh grants is refused as unsupported, and a
+  body that cannot be read is refused as an invalid request.
 - **Access token, refresh token and connection** — what a traded code is
   answered with: a bearer access token that lasts an hour and a refresh token
   that lasts ninety days. The pair is stored as a connection tying the person
@@ -140,6 +147,11 @@ This local declares no entry points of its own.
   refresh token that is unknown, already used, issued to another client, or
   unused for ninety days is refused as an invalid grant, and of two refreshes
   posting the same token at once only one succeeds.
+- **Unexpected error at a sign-in step** — an error nobody planned for at the
+  registration address, the token address or a discovery document is answered
+  with status 500 and a server error. On the approval page it shows the error
+  page instead. Either way its message is never sent to the client or shown to
+  the person, and it is reported to the host's error reporting.
 - **Token lookup** — what the host's sign-in calls with the bearer token from a
   request. It gives the person the access token acts for while the token is
   unexpired, and nothing for an expired, replaced or unknown token. Each lookup
