@@ -1,8 +1,8 @@
 ---
 name: hub_kernel-mcp-install
-description: Use to hook hub_kernel-mcp into a project — adding the gem, naming the controller the endpoint inherits from and the person and account methods on it, naming the browser controller, sign-in method, person method and layout the approval page runs with, running the boot check after the served list is set, mounting the engine, and, for sign-in from a connector screen, installing the migrations and mounting the discovery documents.
+description: Use to hook hub_kernel-mcp into a project — adding the gem, naming the controller the endpoint inherits from and the person and account methods on it, naming the browser controller, sign-in method, person method and layout the approval page runs with, running the boot check after the served list is set, mounting the engine, and, for sign-in from a connector screen, installing the migrations, mounting the discovery documents, and having the host's sign-in look up the person an access token acts for.
 tools: Bash, Read, Edit
-scope: hub MCP tools — serving the methods every hub a host serves, from hub_kernel-interface's one served list, as MCP tools at one JSON-RPC endpoint in a host Rails app, each call behind the host's own sign-in and hub_kernel-interface's permission check and account scope, with a boot check for hubs that cannot be served as tools, the OAuth discovery documents, 401 challenge and client registration that let a client such as Claude's connector screen find the endpoint's sign-in and register by itself, and the approval page where a person signed in to the host through the browser approves that client and is issued an authorization code
+scope: hub MCP tools — serving the methods every hub a host serves, from hub_kernel-interface's one served list, as MCP tools at one JSON-RPC endpoint in a host Rails app, each call behind the host's own sign-in and hub_kernel-interface's permission check and account scope, with a boot check for hubs that cannot be served as tools, the OAuth discovery documents, 401 challenge and client registration that let a client such as Claude's connector screen find the endpoint's sign-in and register by itself, and the approval page where a person signed in to the host through the browser approves that client and is issued an authorization code, the token exchange that trades that code with its PKCE verifier for an access token lasting an hour, and the lookup a host's sign-in calls to get the person a bearer token acts for
 ---
 
 This local follows these steps exactly and invents none. Where a step names a
@@ -24,16 +24,18 @@ a signed-in person's behalf.
 - `mount HubKernel::Mcp::Engine` — mounts the endpoint in the host's
   `config/routes.rb` at the path given. The path answers POST with JSON-RPC and
   answers GET with status 405. A client registers at `<path>/register`, a person
-  approves it at `<path>/authorize`, and every 401 the endpoint answers carries
-  a `WWW-Authenticate` header pointing at the discovery documents.
+  approves it at `<path>/authorize`, the client trades the approval's code for an
+  access token at `<path>/token`, and every 401 the endpoint answers carries a
+  `WWW-Authenticate` header pointing at the discovery documents.
 - `mount HubKernel::Mcp::Discovery` — mounts the two OAuth discovery documents
   in the host's `config/routes.rb`. It must be mounted at `"/.well-known"`,
   since the endpoint's 401 header names that path.
-- `bin/rails hub_kernel_mcp:install:migrations` — copies the gem's two
+- `bin/rails hub_kernel_mcp:install:migrations` — copies the gem's three
   migrations into the host's `db/migrate`. They create the
-  `hub_kernel_mcp_clients` table, which holds each client that registers, and
-  the `hub_kernel_mcp_authorization_codes` table, which holds each code the
-  approval page issues.
+  `hub_kernel_mcp_clients` table, which holds each client that registers, the
+  `hub_kernel_mcp_authorization_codes` table, which holds each code the
+  approval page issues, and the `hub_kernel_mcp_connections` table, which holds
+  each access token issued for a code.
 - `HubKernel::Mcp.base_controller=` — the name, as a String, of the host
   controller the endpoint inherits from. Its before-actions, including sign-in,
   run before any hub is asked. Defaults to `"ActionController::API"`, which has
@@ -62,6 +64,10 @@ a signed-in person's behalf.
 - `HubKernel::Mcp::UnservableHubError` — the error `check!` raises. Its message
   names every problem found, one per line. It is the same class as
   `HubKernel::Interface::UnservableHubError`, so rescuing either catches it.
+- `HubKernel::Mcp::Connection.person_for` — takes the bearer token a client
+  sends, as a String, and returns the person who approved the client the token
+  was issued to. Returns `nil` for a token that is unknown or more than an hour
+  old. The host's sign-in on the base controller calls it.
 
 ## How to use it
 
@@ -151,7 +157,7 @@ a signed-in person's behalf.
 8. Ask the developer whether a client such as Claude's connector screen should
    find the endpoint's sign-in, register and be approved by a person, so a
    person only pastes the endpoint's address. If not, stop here and skip steps
-   9 to 12.
+   9 to 13.
 
 9. Copy the gem's migrations into the host and run them:
 
@@ -159,9 +165,9 @@ a signed-in person's behalf.
    bin/rails hub_kernel_mcp:install:migrations db:migrate
    ```
 
-   This adds two migrations to the host's `db/migrate` and the
-   `hub_kernel_mcp_clients` and `hub_kernel_mcp_authorization_codes` tables to
-   `db/schema.rb`. Commit all three files.
+   This adds three migrations to the host's `db/migrate` and the
+   `hub_kernel_mcp_clients`, `hub_kernel_mcp_authorization_codes` and
+   `hub_kernel_mcp_connections` tables to `db/schema.rb`. Commit all four files.
 
 10. Add the discovery mount to `config/routes.rb`, at the site root beside the
     endpoint's mount, at exactly `"/.well-known"`:
@@ -180,7 +186,34 @@ a signed-in person's behalf.
     other status, tell the developer, and ask whether to change it to answer
     401 for this endpoint.
 
-12. Check the layout from step 4. The approval page runs inside the gem's
+12. Check whether the base controller's sign-in accepts the access token a
+    connector screen sends on every request, as `Authorization: Bearer <token>`.
+    The gem issues the token but does not sign anyone in with it, so the base
+    controller's person method must look the token up:
+
+    ```ruby
+    class Api::McpBaseController < ActionController::API
+      include ActionController::HttpAuthentication::Token::ControllerMethods
+
+      before_action { head :unauthorized unless current_person }
+
+      private
+
+      def current_person = authenticate_with_http_token { |token| HubKernel::Mcp::Connection.person_for(token) }
+    end
+    ```
+
+    If the base controller already signs callers in another way, such as with
+    an API key, ask the developer whether a bearer token from
+    `HubKernel::Mcp::Connection.person_for` should be accepted in addition to
+    it or in its place, and do not choose. A `nil` from `person_for` must end in
+    a 401, as in step 11. Then check that the account method from step 3 returns
+    an account for a person signed in this way, since every call is made in that
+    account. If it reads the account from something a token request does not
+    carry, such as a session or a subdomain, tell the developer and ask what it
+    should return.
+
+13. Check the layout from step 4. The approval page runs inside the gem's
     engine, so a route helper the layout calls for one of the host's own routes,
     such as `root_path`, must be written `main_app.root_path`. If the layout
     calls any host route helper without `main_app.`, show the developer each one
@@ -209,13 +242,17 @@ a signed-in person's behalf.
   while signed out: the host's sign-in should take over. Signed in, a request
   with no registered client and redirect address shows a page saying the app
   asked to send the person to an address it did not register.
+- With the token lookup installed, check it with
+  `bin/rails runner "p HubKernel::Mcp::Connection.person_for('unknown')"`,
+  which should print `nil`, and with `curl -i -X POST <host>/mcp` carrying
+  `Authorization: Bearer unknown`, which should answer 401.
 - Run `bin/rails hub_kernel_mcp:install:migrations` again after upgrading the
   gem, then `db:migrate`. It copies only migrations the host does not have yet.
-- The sign-in document names a token address under the endpoint's path,
-  `<path>/token`. This version of the gem does not answer it, so a connector
-  screen can register and a person can approve it, but the client cannot trade
-  the code for a token through the gem alone. Tell the developer this when they
-  choose step 8.
+  A host that installed an earlier version with two migrations gets the
+  `hub_kernel_mcp_connections` migration this way, and the token address
+  answers with an error until it is run.
+- An access token lasts one hour, and the gem issues no refresh token, so a
+  client signs in again through the approval page after it expires.
 - Out of scope: choosing which hubs are served and setting permissions and
   account scope, which belong to hub_kernel-interface, and changing what the
   endpoint, the discovery documents or the approval page answer, which belongs

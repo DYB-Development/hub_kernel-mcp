@@ -4,4 +4,5 @@ HubKernel::Mcp::Engine.routes.draw do
   post "register", to: "registrations#create"
   get "authorize", to: "authorizations#new"
   post "authorize", to: "authorizations#create"
+  post "token", to: "tokens#create"
 end

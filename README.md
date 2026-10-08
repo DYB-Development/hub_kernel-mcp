@@ -142,11 +142,47 @@ kept by its global id, so it must be a record that has one.
 
 A person who is not signed in is sent through the host's sign-in. A signed-in person sees the
 name of the app asking to connect, with an Approve and a Deny button. Approving sends them back
-to the client's redirect address with a code and the
-client's `state`. Denying sends them back with `error=access_denied` and no code. A request
+to the client's redirect address with a code and the client's `state`. Denying sends them back with `error=access_denied` and no code. A request
 naming a redirect address the client did not register shows an error page and sends the person
 nowhere. A request with no PKCE challenge, or one whose method is not `S256`, is sent back with
 `error=invalid_request`.
+
+The client trades the code at the token address, posting it form-encoded with its PKCE verifier,
+the redirect address it was approved for and its client id:
+
+```
+grant_type=authorization_code&code=<code>&code_verifier=<verifier>&redirect_uri=<redirect>&client_id=<client id>
+```
+
+It is answered with an access token that lasts an hour:
+
+```json
+{ "access_token": "<token>", "token_type": "Bearer", "expires_in": 3600 }
+```
+
+A code is used up by the trade. A code posted with a verifier that does not match its challenge,
+with another redirect address, a second time, or more than ten minutes after it was made is
+answered with status 400 and `invalid_grant`, and gives no token.
+
+The client then sends the token on every request to the endpoint as `Authorization: Bearer
+<token>`. The host's own sign-in, the base controller the endpoint inherits from, asks the gem
+for the person a token acts for:
+
+```ruby
+class Api::McpBaseController < ActionController::API
+  include ActionController::HttpAuthentication::Token::ControllerMethods
+
+  before_action { head :unauthorized unless current_person }
+
+  private
+
+  def current_person = authenticate_with_http_token { |token| HubKernel::Mcp::Connection.person_for(token) }
+end
+```
+
+`HubKernel::Mcp::Connection.person_for` gives the person while the token is unexpired, and `nil`
+for an expired or unknown token. Every call is made in the account the host's account method
+gives, so that method must give one for a person signed in this way.
 
 ## Installation
 
