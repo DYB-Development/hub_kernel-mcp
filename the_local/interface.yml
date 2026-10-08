@@ -1,4 +1,4 @@
-scope: hub MCP tools — serving the methods every hub a host serves, from hub_kernel-interface's one served list, as MCP tools at one JSON-RPC endpoint in a host Rails app, each call behind the host's own sign-in and hub_kernel-interface's permission check and account scope, with a boot check for hubs that cannot be served as tools, the OAuth discovery documents, 401 challenge and client registration that let a client such as Claude's connector screen find the endpoint's sign-in and register by itself, and the approval page where a person signed in to the host through the browser approves that client and is issued an authorization code
+scope: hub MCP tools — serving the methods every hub a host serves, from hub_kernel-interface's one served list, as MCP tools at one JSON-RPC endpoint in a host Rails app, each call behind the host's own sign-in and hub_kernel-interface's permission check and account scope, with a boot check for hubs that cannot be served as tools, the OAuth discovery documents, 401 challenge and client registration that let a client such as Claude's connector screen find the endpoint's sign-in and register by itself, and the approval page where a person signed in to the host through the browser approves that client and is issued an authorization code, the token exchange that trades that code with its PKCE verifier for an access token lasting an hour, and the lookup a host's sign-in calls to get the person a bearer token acts for
 
 install:
   - gem "hub_kernel-mcp"
@@ -14,6 +14,7 @@ install:
   - HubKernel::Mcp.browser_layout=
   - HubKernel::Mcp.check!
   - HubKernel::Mcp::UnservableHubError
+  - HubKernel::Mcp::Connection.person_for
 
 develop:
   - POST /
@@ -24,6 +25,7 @@ develop:
   - POST /register
   - GET /authorize
   - POST /authorize
+  - POST /token
   - WWW-Authenticate
   - GET /.well-known/oauth-protected-resource
   - GET /.well-known/oauth-authorization-server
@@ -36,12 +38,15 @@ sources:
   - config/routes.rb
   - db/migrate/20261007000000_create_hub_kernel_mcp_clients.rb
   - db/migrate/20261008000000_create_hub_kernel_mcp_authorization_codes.rb
+  - db/migrate/20261009000000_create_hub_kernel_mcp_connections.rb
   - app/models/hub_kernel/mcp/client.rb
   - app/models/hub_kernel/mcp/authorization_code.rb
+  - app/models/hub_kernel/mcp/connection.rb
   - app/controllers/hub_kernel/mcp/messages_controller.rb
   - app/controllers/hub_kernel/mcp/discovery_controller.rb
   - app/controllers/hub_kernel/mcp/registrations_controller.rb
   - app/controllers/hub_kernel/mcp/authorizations_controller.rb
+  - app/controllers/hub_kernel/mcp/tokens_controller.rb
   - app/views/hub_kernel/mcp/authorizations/new.html.erb
   - app/views/hub_kernel/mcp/authorizations/unregistered_redirect.html.erb
   - README.md
