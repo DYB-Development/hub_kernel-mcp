@@ -16,6 +16,12 @@ class ConnectionsSectionTest < ActiveSupport::TestCase
     assert_equal [ "Claude Connected October 08, 2026 09:30 Last used October 08, 2026 09:50 Disconnect" ], section_for(Person.new("sam")).css("li").map { |item| item.text.squish }
   end
 
+  test "a connection's Disconnect button sends its id to the section's address by PATCH" do
+    form = section_for(Person.new("sam")).at_css("li form")
+
+    assert_equal [ "/settings/connections", "patch", HubKernel::Mcp::Connection.of(Person.new("sam")).sole.id.to_s ], [ form["action"], form.at_css("input[name=_method]")["value"], form.at_css("input[name=connection_id]")["value"] ]
+  end
+
   private
 
   def section_for(person)
