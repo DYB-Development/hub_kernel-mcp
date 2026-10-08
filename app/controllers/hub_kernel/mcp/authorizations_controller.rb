@@ -2,7 +2,7 @@ require "uri"
 
 module HubKernel
   module Mcp
-    class AuthorizationsController < HubKernel::Mcp.browser_controller.constantize
+    class AuthorizationsController < ApplicationController
       APPROVAL_PARAMS = %i[response_type client_id redirect_uri state code_challenge code_challenge_method].freeze
 
       layout -> { HubKernel::Mcp.browser_layout }

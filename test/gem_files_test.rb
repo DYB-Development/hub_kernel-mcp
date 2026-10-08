@@ -12,4 +12,10 @@ class GemFilesTest < ActiveSupport::TestCase
 
     assert_includes files, "db/migrate/20261007000000_create_hub_kernel_mcp_clients.rb"
   end
+
+  test "the packaged gem depends on keystone_ui for the pages it shows a person" do
+    dependencies = Gem::Specification.load(File.expand_path("../hub_kernel-mcp.gemspec", __dir__)).runtime_dependencies
+
+    assert_includes dependencies.map(&:name), "keystone_ui"
+  end
 end

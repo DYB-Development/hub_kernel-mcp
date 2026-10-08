@@ -1,1 +1,3 @@
-<h1><%= @reason %></h1>
+<%= ui_page_header(title: "Can't connect") %>
+
+<%= ui_alert(message: @reason, type: :error) %>
