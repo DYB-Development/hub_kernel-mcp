@@ -11,7 +11,7 @@ module HubKernel
 
       private
 
-      def exchangeable?(code) = code.present? && code.expires_at.future? && code.redirect_uri == params[:redirect_uri] && code.verifies?(params[:code_verifier]) && used_up?(code)
+      def exchangeable?(code) = code.present? && code.expires_at.future? && code.client.uid == params[:client_id] && code.redirect_uri == params[:redirect_uri] && code.verifies?(params[:code_verifier]) && used_up?(code)
 
       def used_up?(code) = AuthorizationCode.where(id: code.id).delete_all == 1
     end

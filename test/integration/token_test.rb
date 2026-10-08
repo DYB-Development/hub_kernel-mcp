@@ -41,6 +41,14 @@ class TokenTest < ActionDispatch::IntegrationTest
     assert_refused
   end
 
+  test "a code posted with another client's id is refused and gives no token" do
+    other = HubKernel::Mcp::Client.create!(name: "Other", redirect_uris: [ "https://claude.ai/callback" ])
+
+    post "/mcp/token", params: @exchange.merge(client_id: other.uid)
+
+    assert_refused
+  end
+
   private
 
   def assert_refused
