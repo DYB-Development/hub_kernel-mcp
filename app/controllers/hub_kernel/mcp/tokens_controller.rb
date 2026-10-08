@@ -2,14 +2,20 @@ module HubKernel
   module Mcp
     class TokensController < ActionController::API
       def create
-        code = AuthorizationCode.find_by(code_digest: AuthorizationCode.digest(params[:code].to_s))
-        return render(status: :bad_request, json: { error: "invalid_grant" }) unless exchangeable?(code)
+        tokens = params[:grant_type] == "refresh_token" ? refreshed : exchanged
+        return render(status: :bad_request, json: { error: "invalid_grant" }) unless tokens
 
-        tokens = Connection.issue(person: code.person, client: code.client)
         render json: { access_token: tokens.access_token, token_type: "Bearer", expires_in: Connection::LIFETIME.to_i, refresh_token: tokens.refresh_token }
       end
 
       private
+
+      def exchanged
+        code = AuthorizationCode.find_by(code_digest: AuthorizationCode.digest(params[:code].to_s))
+        Connection.issue(person: code.person, client: code.client) if exchangeable?(code)
+      end
+
+      def refreshed = Connection.refresh(params[:refresh_token], client: Client.find_by(uid: params[:client_id]))
 
       def exchangeable?(code) = code.present? && code.expires_at.future? && code.client.uid == params[:client_id] && code.redirect_uri == params[:redirect_uri] && code.verifies?(params[:code_verifier]) && used_up?(code)
 

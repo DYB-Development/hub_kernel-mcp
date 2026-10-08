@@ -55,6 +55,16 @@ class TokenTest < ActionDispatch::IntegrationTest
     assert_equal HubKernel::Mcp::Connection.sole.refresh_token_digest, HubKernel::Mcp::Connection.digest(response.parsed_body["refresh_token"].to_s)
   end
 
+  test "a client posting its refresh token gets a new access token and a new refresh token" do
+    post "/mcp/token", params: @exchange
+    first = response.parsed_body
+
+    post "/mcp/token", params: { grant_type: "refresh_token", refresh_token: first["refresh_token"], client_id: @client.uid }
+
+    answer = response.parsed_body
+    assert_equal [ 200, Person.new("sam"), false ], [ response.status, HubKernel::Mcp::Connection.person_for(answer["access_token"]), answer["refresh_token"].in?([ nil, first["refresh_token"] ]) ]
+  end
+
   private
 
   def assert_refused
