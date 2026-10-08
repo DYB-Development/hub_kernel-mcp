@@ -2,10 +2,9 @@ require "uri"
 
 module HubKernel
   module Mcp
-    class AuthorizationsController < HubKernel::Mcp.browser_controller.constantize
+    class AuthorizationsController < ApplicationController
       APPROVAL_PARAMS = %i[response_type client_id redirect_uri state code_challenge code_challenge_method].freeze
 
-      helper KeystoneUiHelper
       layout -> { HubKernel::Mcp.browser_layout }
 
       before_action { send(HubKernel::Mcp.sign_in_method) }
