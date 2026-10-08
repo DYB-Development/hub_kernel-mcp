@@ -49,6 +49,12 @@ class TokenTest < ActionDispatch::IntegrationTest
     assert_refused
   end
 
+  test "a client trading a code also gets a refresh token" do
+    post "/mcp/token", params: @exchange
+
+    assert_equal HubKernel::Mcp::Connection.sole.refresh_token_digest, HubKernel::Mcp::Connection.digest(response.parsed_body["refresh_token"].to_s)
+  end
+
   private
 
   def assert_refused
