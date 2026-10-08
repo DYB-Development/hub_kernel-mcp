@@ -46,6 +46,14 @@ class ApprovalTest < ActionDispatch::IntegrationTest
     assert_equal [ 400, nil, "This app asked to send you to an address it did not register" ], [ response.status, response.location, css_select("h1").text ]
   end
 
+  test "an approval request whose PKCE challenge uses a method other than SHA-256 is refused" do
+    sign_in "sam"
+
+    get "/mcp/authorize", params: @approval.merge(code_challenge_method: "plain")
+
+    assert_redirected_to "https://claude.ai/callback?error=invalid_request&error_description=A+PKCE+challenge+using+S256+is+required&state=xyz"
+  end
+
   private
 
   def sign_in(person) = get("/sign_in", params: { person: person, return_to: "/" })

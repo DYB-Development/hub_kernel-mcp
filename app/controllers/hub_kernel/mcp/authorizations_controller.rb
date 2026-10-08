@@ -9,6 +9,7 @@ module HubKernel
 
       before_action { send(HubKernel::Mcp.sign_in_method) }
       before_action :refuse_unregistered_redirect
+      before_action :refuse_without_pkce
 
       helper_method :approval_params
 
@@ -27,6 +28,10 @@ module HubKernel
       def refuse_unregistered_redirect
         @client = Client.find_by(uid: params[:client_id])
         render :unregistered_redirect, status: :bad_request unless @client&.redirect_uris&.include?(params[:redirect_uri])
+      end
+
+      def refuse_without_pkce
+        redirect_to_client(error: "invalid_request", error_description: "A PKCE challenge using S256 is required") unless params[:code_challenge_method] == "S256"
       end
 
       def redirect_to_client(answer)
