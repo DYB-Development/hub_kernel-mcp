@@ -33,6 +33,14 @@ class TokenTest < ActionDispatch::IntegrationTest
     assert_equal [ 400, { "error" => "invalid_grant" }, 1 ], [ response.status, response.parsed_body, HubKernel::Mcp::Connection.count ]
   end
 
+  test "a code posted more than ten minutes after it was made is refused and gives no token" do
+    travel 10.minutes + 1.second
+
+    post "/mcp/token", params: @exchange
+
+    assert_refused
+  end
+
   private
 
   def assert_refused
