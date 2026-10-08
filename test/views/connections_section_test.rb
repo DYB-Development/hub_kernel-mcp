@@ -28,6 +28,10 @@ class ConnectionsSectionTest < ActionView::TestCase
     assert_equal [ "Claude" ], section_for(Person.new("sam")).css("li > div.ks-panel strong").map(&:text)
   end
 
+  test "a connection's Disconnect button is keystone's danger button" do
+    assert_equal [ "ks-button ks-button-danger ks-button-md" ], section_for(Person.new("sam")).css("li form button").map { |button| button["class"] }
+  end
+
   private
 
   def section_for(person)
