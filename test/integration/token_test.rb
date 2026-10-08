@@ -30,7 +30,7 @@ class TokenTest < ActionDispatch::IntegrationTest
     post "/mcp/token", params: @exchange
     post "/mcp/token", params: @exchange
 
-    assert_equal [ 400, { "error" => "invalid_grant", "error_description" => "The code is unknown, used, expired, or does not match this client, redirect address or verifier" }, 1 ], [ response.status, response.parsed_body, HubKernel::Mcp::Connection.count ]
+    assert_refused
   end
 
   test "a code posted more than ten minutes after it was made is refused and gives no token" do
@@ -81,6 +81,14 @@ class TokenTest < ActionDispatch::IntegrationTest
     post "/mcp/token", params: "{", headers: { "Content-Type" => "application/json" }
 
     assert_equal [ 400, { "error" => "invalid_request", "error_description" => "The token request body could not be read" } ], [ response.status, response.parsed_body ]
+  end
+
+  test "a code used a second time also stops the tokens issued from it" do
+    post "/mcp/token", params: @exchange
+    issued = response.parsed_body
+    post "/mcp/token", params: @exchange
+
+    assert_equal [ nil, nil ], [ HubKernel::Mcp::Connection.person_for(issued["access_token"]), HubKernel::Mcp::Connection.refresh(issued["refresh_token"], client: @client) ]
   end
 
   private

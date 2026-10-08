@@ -25,8 +25,16 @@ module HubKernel
       def refuse(error, description) = render(status: :bad_request, json: { error: error, error_description: description })
 
       def exchanged
-        code = AuthorizationCode.find_by(code_digest: AuthorizationCode.digest(params[:code].to_s))
-        Connection.issue(person: code.person, client: code.client) if exchangeable?(code)
+        code_digest = AuthorizationCode.digest(params[:code].to_s)
+        code = AuthorizationCode.find_by(code_digest: code_digest)
+        return stop_tokens_issued_from(code_digest) unless code
+
+        Connection.issue(person: code.person, client: code.client, code_digest: code_digest) if exchangeable?(code)
+      end
+
+      def stop_tokens_issued_from(code_digest)
+        Connection.where(code_digest: code_digest).delete_all
+        nil
       end
 
       def refreshed = Connection.refresh(params[:refresh_token], client: Client.find_by(uid: params[:client_id]))
