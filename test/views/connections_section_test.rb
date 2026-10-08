@@ -11,29 +11,17 @@ class ConnectionsSectionTest < ActionView::TestCase
     HubKernel::Mcp::Connection.issue(person: Person.new("alex"), client: other)
   end
 
-  test "a person's connections are listed with the app's name, when it connected and when it was last used" do
+  test "a person's connections are rows of a keystone table naming the app, when it connected and when it was last used" do
     travel 20.minutes
     HubKernel::Mcp::Connection.person_for(@tokens.access_token)
 
-    assert_equal [ "Claude Connected October 08, 2026 09:30 Last used October 08, 2026 09:50 Disconnect" ], section_for(Person.new("sam")).css("li").map { |item| item.text.squish }
+    assert_equal [ [ "Claude", "October 08, 2026 09:30", "October 08, 2026 09:50" ] ], section_for(Person.new("sam")).css(".ks-table tbody tr").map { |row| row.css("td").first(3).map { |cell| cell.text.squish } }
   end
 
-  test "a connection's Disconnect button sends its id to the section's address by PATCH" do
-    form = section_for(Person.new("sam")).at_css("li form")
+  test "a connection's Disconnect menu item sends its id to the section's address by PATCH" do
+    form = section_for(Person.new("sam")).at_css(".ks-table tbody form")
 
-    assert_equal [ "/settings/connections", "patch", HubKernel::Mcp::Connection.of(Person.new("sam")).sole.id.to_s ], [ form["action"], form.at_css("input[name=_method]")["value"], form.at_css("input[name=connection_id]")["value"] ]
-  end
-
-  test "each connection is shown in its own keystone panel" do
-    assert_equal [ "Disconnect" ], section_for(Person.new("sam")).css("li div.ks-panel button").map(&:text)
-  end
-
-  test "a connection's Disconnect button is keystone's danger button" do
-    assert_equal [ "ks-button ks-button-danger ks-button-md" ], section_for(Person.new("sam")).css("li form button").map { |button| button["class"] }
-  end
-
-  test "a connection's app name is the title of a keystone section" do
-    assert_equal [ "Claude" ], section_for(Person.new("sam")).css("li h2.ks-section-title").map(&:text)
+    assert_equal [ "/settings/connections?connection_id=#{HubKernel::Mcp::Connection.of(Person.new("sam")).sole.id}", "patch", "Disconnect" ], [ form["action"], form.at_css("input[name=_method]")["value"], form.at_css("button").text.squish ]
   end
 
   private
