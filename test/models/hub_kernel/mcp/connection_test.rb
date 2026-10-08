@@ -50,4 +50,20 @@ class HubKernel::Mcp::ConnectionTest < ActiveSupport::TestCase
 
     assert_nil HubKernel::Mcp::Connection.refresh(tokens.refresh_token, client: @client)
   end
+
+  test "looking up a person by an access token records when the connection was last used" do
+    tokens = HubKernel::Mcp::Connection.issue(person: Person.new("sam"), client: @client)
+    travel 30.minutes
+
+    HubKernel::Mcp::Connection.person_for(tokens.access_token)
+
+    assert_equal Time.current, HubKernel::Mcp::Connection.sole.last_used_at
+  end
+
+  test "a person's connections hold only the ones acting for that person" do
+    HubKernel::Mcp::Connection.issue(person: Person.new("sam"), client: @client)
+    HubKernel::Mcp::Connection.issue(person: Person.new("alex"), client: @client)
+
+    assert_equal [ Person.new("sam") ], HubKernel::Mcp::Connection.of(Person.new("sam")).map(&:person)
+  end
 end

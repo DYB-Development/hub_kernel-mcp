@@ -11,6 +11,8 @@ module HubKernel
 
       belongs_to :client
 
+      scope :of, ->(person) { where(person_gid: person.to_global_id.to_s) }
+
       def self.issue(person:, client:)
         tokens = new_tokens
         create!(person_gid: person.to_global_id.to_s, client: client, **digests_for(tokens))
@@ -26,7 +28,11 @@ module HubKernel
         tokens if renewed == 1
       end
 
-      def self.person_for(token) = where(expires_at: Time.current..).find_by(token_digest: digest(token.to_s))&.person
+      def self.person_for(token)
+        connection = where(expires_at: Time.current..).find_by(token_digest: digest(token.to_s))
+        connection&.touch(:last_used_at)
+        connection&.person
+      end
 
       def self.digest(token) = Digest::SHA256.hexdigest(token)
 
