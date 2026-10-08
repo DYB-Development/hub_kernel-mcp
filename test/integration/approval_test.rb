@@ -99,6 +99,14 @@ class ApprovalTest < ActionDispatch::IntegrationTest
     assert_equal "false", css_select("form").sole["data-turbo"]
   end
 
+  test "the approval page names the app asking to connect in keystone_ui's page header" do
+    sign_in "sam"
+
+    get "/mcp/authorize", params: @approval
+
+    assert_equal "Claude wants to connect as you", css_select(".ks-page-header .ks-page-header-title").text
+  end
+
   private
 
   def sign_in(person) = get("/sign_in", params: { person: person, return_to: "/" })

@@ -1,4 +1,4 @@
-<h1><%= @client.name %> wants to connect as you</h1>
+<%= ui_page_header(title: "#{@client.name} wants to connect as you") %>
 
 <%= form_with url: request.path, method: :post, data: { turbo: false } do |form| %>
   <% approval_params.each do |name, value| %>
