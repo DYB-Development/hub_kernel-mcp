@@ -1,3 +1,5 @@
+require "uri"
+
 module HubKernel
   module Mcp
     class AuthorizationsController < HubKernel::Mcp.browser_controller.constantize
@@ -13,7 +15,19 @@ module HubKernel
         @client = Client.find_by!(uid: params[:client_id])
       end
 
+      def create
+        client = Client.find_by!(uid: params[:client_id])
+        code = AuthorizationCode.issue(person: send(HubKernel::Mcp.browser_person_method), client: client, redirect_uri: params[:redirect_uri], code_challenge: params[:code_challenge])
+        redirect_to_client(code: code)
+      end
+
       private
+
+      def redirect_to_client(answer)
+        uri = URI.parse(params[:redirect_uri])
+        uri.query = [ uri.query, answer.merge(state: params[:state]).compact.to_query ].compact_blank.join("&")
+        redirect_to uri.to_s, allow_other_host: true
+      end
 
       def approval_params = params.permit(*APPROVAL_PARAMS)
     end

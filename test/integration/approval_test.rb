@@ -21,6 +21,15 @@ class ApprovalTest < ActionDispatch::IntegrationTest
     assert_equal [ "Dummy", "Claude wants to connect as you", [ "Approve", "Deny" ] ], [ css_select("title").text, css_select("h1").text, css_select("button").map(&:text) ]
   end
 
+  test "a person who approves is sent back to the client's redirect address with a code and the client's state" do
+    sign_in "sam"
+
+    post "/mcp/authorize", params: @approval.merge(decision: "approve")
+
+    answer = Rack::Utils.parse_query(URI(response.location).query)
+    assert_equal [ "https://claude.ai/callback", "xyz", HubKernel::Mcp::AuthorizationCode.sole.code_digest ], [ response.location.split("?").first, answer["state"], HubKernel::Mcp::AuthorizationCode.digest(answer["code"]) ]
+  end
+
   private
 
   def sign_in(person) = get("/sign_in", params: { person: person, return_to: "/" })
