@@ -196,6 +196,22 @@ end
 for an expired or unknown token. Every call is made in the account the host's account method
 gives, so that method must give one for a person signed in this way.
 
+A person can see the apps connected as them and disconnect one. The gem ships a section for a
+host's settings page: the `hub_kernel/mcp/connections` partial, which lists each of the person's
+connections with the app's name, when it connected and when it was last used, and the
+`HubKernel::Mcp::Disconnect` action its Disconnect buttons run. A host using settings_hub
+registers both:
+
+```ruby
+SettingsHub.section :connections, area: :user, title: "Connected apps",
+  renders: "hub_kernel/mcp/connections", runs: "HubKernel::Mcp::Disconnect"
+```
+
+The partial takes the `person` and the `submit_url` its buttons send a `connection_id` to by
+PATCH. The action is built with `new(person:, account:, values:)`, and `call` answers a result
+whose `ok?` is false, with a `message`, when the connection is not the person's own. A
+disconnected connection's access and refresh tokens stop working at once.
+
 ## Installation
 
 ```ruby
