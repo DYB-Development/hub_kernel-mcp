@@ -43,7 +43,7 @@ class ApprovalTest < ActionDispatch::IntegrationTest
 
     get "/mcp/authorize", params: @approval.merge(redirect_uri: "https://elsewhere.example/callback")
 
-    assert_equal [ 400, nil, "This app asked to send you to an address it did not register" ], [ response.status, response.location, css_select("h1").text ]
+    assert_equal [ 400, nil, "This app asked to send you to an address it did not register" ], [ response.status, response.location, refusal_reason ]
   end
 
   test "an approval request whose PKCE challenge uses a method other than SHA-256 is refused" do
@@ -67,7 +67,7 @@ class ApprovalTest < ActionDispatch::IntegrationTest
 
     get "/mcp/authorize", params: @approval.merge(client_id: "unknown")
 
-    assert_equal [ 400, nil, "The app asking to connect is not registered" ], [ response.status, response.location, css_select("h1").text ]
+    assert_equal [ 400, nil, "The app asking to connect is not registered" ], [ response.status, response.location, refusal_reason ]
   end
 
   test "an approval request missing its client id or redirect address shows an error page naming it and sends the person nowhere" do
@@ -75,7 +75,7 @@ class ApprovalTest < ActionDispatch::IntegrationTest
 
     pages = %i[client_id redirect_uri].map do |missing|
       get "/mcp/authorize", params: @approval.except(missing)
-      [ response.status, response.location, css_select("h1").text ]
+      [ response.status, response.location, refusal_reason ]
     end
 
     assert_equal [ [ 400, nil, "The approval request is missing client_id" ], [ 400, nil, "The approval request is missing redirect_uri" ] ], pages
@@ -88,7 +88,7 @@ class ApprovalTest < ActionDispatch::IntegrationTest
       capture_error_reports { get "/mcp/authorize", params: @approval }
     end
 
-    assert_equal [ [ RuntimeError ], 500, "Signing in failed unexpectedly" ], [ reports.map { |report| report.error.class }, response.status, css_select("h1").text ]
+    assert_equal [ [ RuntimeError ], 500, "Signing in failed unexpectedly" ], [ reports.map { |report| report.error.class }, response.status, refusal_reason ]
   end
 
   test "the approval forms are posted by the browser itself, so a Turbo host follows their redirect to the client" do
@@ -123,7 +123,17 @@ class ApprovalTest < ActionDispatch::IntegrationTest
     assert_equal "ks-button ks-button-secondary ks-button-md", decision_form("deny").at_css("button")["class"]
   end
 
+  test "a refused approval request shows its reason in keystone_ui's error alert" do
+    sign_in "sam"
+
+    get "/mcp/authorize", params: @approval.merge(client_id: "unknown")
+
+    assert_equal "The app asking to connect is not registered", css_select(".ks-alert-error .ks-alert-message").text
+  end
+
   private
+
+  def refusal_reason = css_select(".ks-alert-message").text
 
   def decision_form(decision) = css_select("form.ks-form").find { |form| form.at_css("input[name=decision]")&.[]("value") == decision }
 
