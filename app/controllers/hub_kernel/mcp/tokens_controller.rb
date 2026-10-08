@@ -1,9 +1,11 @@
 module HubKernel
   module Mcp
     class TokensController < ActionController::API
+      UNUSABLE_CODE = "The code is unknown, used, expired, or does not match this client, redirect address or verifier".freeze
+
       def create
         tokens = params[:grant_type] == "refresh_token" ? refreshed : exchanged
-        return render(status: :bad_request, json: { error: "invalid_grant" }) unless tokens
+        return render(status: :bad_request, json: { error: "invalid_grant", error_description: UNUSABLE_CODE }) unless tokens
 
         render json: { access_token: tokens.access_token, token_type: "Bearer", expires_in: Connection::LIFETIME.to_i, refresh_token: tokens.refresh_token }
       end

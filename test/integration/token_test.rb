@@ -30,7 +30,7 @@ class TokenTest < ActionDispatch::IntegrationTest
     post "/mcp/token", params: @exchange
     post "/mcp/token", params: @exchange
 
-    assert_equal [ 400, { "error" => "invalid_grant" }, 1 ], [ response.status, response.parsed_body, HubKernel::Mcp::Connection.count ]
+    assert_equal [ 400, { "error" => "invalid_grant", "error_description" => "The code is unknown, used, expired, or does not match this client, redirect address or verifier" }, 1 ], [ response.status, response.parsed_body, HubKernel::Mcp::Connection.count ]
   end
 
   test "a code posted more than ten minutes after it was made is refused and gives no token" do
@@ -68,6 +68,6 @@ class TokenTest < ActionDispatch::IntegrationTest
   private
 
   def assert_refused
-    assert_equal [ 400, { "error" => "invalid_grant" }, 0 ], [ response.status, response.parsed_body, HubKernel::Mcp::Connection.count ]
+    assert_equal [ 400, { "error" => "invalid_grant", "error_description" => "The code is unknown, used, expired, or does not match this client, redirect address or verifier" }, 0 ], [ response.status, response.parsed_body, HubKernel::Mcp::Connection.count ]
   end
 end
