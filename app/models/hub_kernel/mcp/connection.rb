@@ -26,7 +26,11 @@ module HubKernel
         tokens if renewed == 1
       end
 
-      def self.person_for(token) = where(expires_at: Time.current..).find_by(token_digest: digest(token.to_s))&.person
+      def self.person_for(token)
+        connection = where(expires_at: Time.current..).find_by(token_digest: digest(token.to_s))
+        connection&.touch(:last_used_at)
+        connection&.person
+      end
 
       def self.digest(token) = Digest::SHA256.hexdigest(token)
 

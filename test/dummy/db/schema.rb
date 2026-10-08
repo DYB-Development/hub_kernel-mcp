@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_10_09_000001) do
+ActiveRecord::Schema[8.1].define(version: 2026_10_09_000002) do
   create_table "hub_kernel_mcp_authorization_codes", force: :cascade do |t|
     t.string "code_digest", null: false
     t.integer "client_id", null: false
@@ -42,6 +42,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_09_000001) do
     t.datetime "updated_at", null: false
     t.string "refresh_token_digest"
     t.datetime "refresh_expires_at"
+    t.datetime "last_used_at"
     t.index ["client_id"], name: "index_hub_kernel_mcp_connections_on_client_id"
     t.index ["refresh_token_digest"], name: "index_hub_kernel_mcp_connections_on_refresh_token_digest", unique: true
     t.index ["token_digest"], name: "index_hub_kernel_mcp_connections_on_token_digest", unique: true
