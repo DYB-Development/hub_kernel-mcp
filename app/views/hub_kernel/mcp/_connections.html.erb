@@ -1,7 +1,7 @@
 <% connections = HubKernel::Mcp::Connection.of(person).includes(:client).order(:created_at).map do |connection|
   { id: connection.id, app: connection.client.name, connected: l(connection.created_at, format: :long), last_used: connection.last_used_at ? l(connection.last_used_at, format: :long) : "Never" }
 end %>
-<%= ui_data_table(items: connections, columns: [ { app: "App" }, { connected: "Connected" }, { last_used: "Last used" } ]) do |table| %>
+<%= ui_data_table(items: connections, columns: [ { app: "App" }, { connected: "Connected" }, { last_used: "Last used" } ], empty_message: "No apps are connected.") do |table| %>
   <% table.actions do |connection| %>
     <%= ui_action_menu_item(label: "Disconnect", href: "#{submit_url}?#{{ connection_id: connection[:id] }.to_query}", method: :patch) %>
   <% end %>

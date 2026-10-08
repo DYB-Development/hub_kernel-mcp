@@ -24,6 +24,10 @@ class ConnectionsSectionTest < ActionView::TestCase
     assert_equal [ "/settings/connections?connection_id=#{HubKernel::Mcp::Connection.of(Person.new("sam")).sole.id}", "patch", "Disconnect" ], [ form["action"], form.at_css("input[name=_method]")["value"], form.at_css("button").text.squish ]
   end
 
+  test "a person with no connected apps is told so in the table" do
+    assert_equal [ "No apps are connected." ], section_for(Person.new("kim")).css(".ks-table tbody td").map { |cell| cell.text.squish }
+  end
+
   private
 
   def section_for(person)
