@@ -1,9 +1,16 @@
 <%= ui_page_header(title: "#{@client.name} wants to connect as you") %>
 
+<%= ui_form(action: request.path, data: { turbo: false }) do %>
+  <% approval_params.each do |name, value| %>
+    <%= hidden_field_tag name, value %>
+  <% end %>
+  <%= hidden_field_tag :decision, "approve" %>
+  <%= ui_button(label: "Approve") %>
+<% end %>
+
 <%= form_with url: request.path, method: :post, data: { turbo: false } do |form| %>
   <% approval_params.each do |name, value| %>
     <%= hidden_field_tag name, value %>
   <% end %>
-  <%= form.button "Approve", name: "decision", value: "approve" %>
   <%= form.button "Deny", name: "decision", value: "deny" %>
 <% end %>

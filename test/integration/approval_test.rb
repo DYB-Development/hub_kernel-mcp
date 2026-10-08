@@ -91,12 +91,12 @@ class ApprovalTest < ActionDispatch::IntegrationTest
     assert_equal [ [ RuntimeError ], 500, "Signing in failed unexpectedly" ], [ reports.map { |report| report.error.class }, response.status, css_select("h1").text ]
   end
 
-  test "the approval form is posted by the browser itself, so a Turbo host follows its redirect to the client" do
+  test "the approval forms are posted by the browser itself, so a Turbo host follows their redirect to the client" do
     sign_in "sam"
 
     get "/mcp/authorize", params: @approval
 
-    assert_equal "false", css_select("form").sole["data-turbo"]
+    assert_equal [ "false" ], css_select("form").map { |form| form["data-turbo"] }.uniq
   end
 
   test "the approval page names the app asking to connect in keystone_ui's page header" do
@@ -107,7 +107,17 @@ class ApprovalTest < ActionDispatch::IntegrationTest
     assert_equal "Claude wants to connect as you", css_select(".ks-page-header .ks-page-header-title").text
   end
 
+  test "Approve is keystone_ui's primary button in a form that sends approve" do
+    sign_in "sam"
+
+    get "/mcp/authorize", params: @approval
+
+    assert_equal "ks-button ks-button-primary ks-button-md", decision_form("approve").at_css("button")["class"]
+  end
+
   private
+
+  def decision_form(decision) = css_select("form.ks-form").find { |form| form.at_css("input[name=decision]")&.[]("value") == decision }
 
   def sign_in(person) = get("/sign_in", params: { person: person, return_to: "/" })
 end
