@@ -1,4 +1,4 @@
-scope: hub MCP tools — serving the methods every hub a host serves, from hub_kernel-interface's one served list, as MCP tools at one JSON-RPC endpoint in a host Rails app, each call behind the host's own sign-in and hub_kernel-interface's permission check and account scope, with a boot check for hubs that cannot be served as tools, the OAuth discovery documents, 401 challenge and client registration that let a client such as Claude's connector screen find the endpoint's sign-in and register by itself, and the approval page where a person signed in to the host through the browser approves that client and is issued an authorization code, the token exchange that trades that code with its PKCE verifier for an access token lasting an hour and a refresh token, the refresh exchange that trades a refresh token for a new access token and a new refresh token and retires the one posted, and the lookup a host's sign-in calls to get the person a bearer token acts for, which records when the connection was last used, and the settings section a host registers with settings_hub that lists a person's connections with the app's name, when it connected and when it was last used, and disconnects one that is the person's own
+scope: hub MCP tools — serving the methods every hub a host serves, from hub_kernel-interface's one served list, as MCP tools at one JSON-RPC endpoint in a host Rails app, each call behind the host's own sign-in and hub_kernel-interface's permission check and account scope, with a boot check for hubs that cannot be served as tools, the OAuth discovery documents, 401 challenge and client registration that let a client such as Claude's connector screen find the endpoint's sign-in and register by itself, with each client recording the address it registered from and a configurable limit on how many clients one address may register per hour past which registration is refused, and the approval page where a person signed in to the host through the browser approves that client and is issued an authorization code, the token exchange that trades that code with its PKCE verifier for an access token lasting an hour and a refresh token, the refresh exchange that trades a refresh token for a new access token and a new refresh token and retires the one posted, and the lookup a host's sign-in calls to get the person a bearer token acts for, which records when the connection was last used, and the settings section a host registers with settings_hub that lists a person's connections with the app's name, when it connected and when it was last used, and disconnects one that is the person's own, and the prune task a host schedules with its own job runner that removes expired authorization codes, connections whose access and refresh tokens have both expired, and clients over a day old with no connection
 
 install:
   - gem "hub_kernel-mcp"
@@ -12,12 +12,15 @@ install:
   - HubKernel::Mcp.sign_in_method=
   - HubKernel::Mcp.browser_person_method=
   - HubKernel::Mcp.browser_layout=
+  - HubKernel::Mcp.registration_limit=
   - HubKernel::Mcp.check!
   - HubKernel::Mcp::UnservableHubError
   - HubKernel::Mcp::Connection.person_for
   - SettingsHub.section
   - hub_kernel/mcp/connections
   - HubKernel::Mcp::Disconnect
+  - bin/rails hub_kernel_mcp:prune
+  - HubKernel::Mcp::Prune.call
 
 develop:
   - POST /
@@ -47,10 +50,13 @@ sources:
   - db/migrate/20261009000001_add_refresh_token_to_hub_kernel_mcp_connections.rb
   - db/migrate/20261009000002_add_last_used_at_to_hub_kernel_mcp_connections.rb
   - db/migrate/20261009000003_add_code_digest_to_hub_kernel_mcp_connections.rb
+  - db/migrate/20261009000004_add_registered_from_to_hub_kernel_mcp_clients.rb
   - app/models/hub_kernel/mcp/client.rb
   - app/models/hub_kernel/mcp/authorization_code.rb
   - app/models/hub_kernel/mcp/connection.rb
   - app/models/hub_kernel/mcp/disconnect.rb
+  - app/models/hub_kernel/mcp/prune.rb
+  - lib/tasks/hub_kernel_mcp.rake
   - app/controllers/hub_kernel/mcp/messages_controller.rb
   - app/controllers/hub_kernel/mcp/discovery_controller.rb
   - app/controllers/hub_kernel/mcp/registrations_controller.rb

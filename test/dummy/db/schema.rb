@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_10_09_000003) do
+ActiveRecord::Schema[8.1].define(version: 2026_10_09_000004) do
   create_table "hub_kernel_mcp_authorization_codes", force: :cascade do |t|
     t.string "code_digest", null: false
     t.integer "client_id", null: false
@@ -30,6 +30,8 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_09_000003) do
     t.json "redirect_uris", null: false
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
+    t.string "registered_from"
+    t.index ["registered_from", "created_at"], name: "index_hub_kernel_mcp_clients_on_registered_from_and_created_at"
     t.index ["uid"], name: "index_hub_kernel_mcp_clients_on_uid", unique: true
   end
 

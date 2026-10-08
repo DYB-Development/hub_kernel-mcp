@@ -125,7 +125,13 @@ A client registers by posting its name and redirect addresses to the registratio
 It is answered with status 201 and a client id. A registration with no redirect address, or
 with one that is neither HTTPS nor on the client's own machine, is answered with status 400,
 `invalid_redirect_uri`, and the reason. A body that is not valid JSON is answered with status
-400 and `invalid_client_metadata`.
+400 and `invalid_client_metadata`. One address may register ten clients an hour, and a
+registration past that is answered with status 429 and `too_many_registrations`. A host sets a
+different limit with:
+
+```ruby
+HubKernel::Mcp.registration_limit = 20
+```
 
 The approval address is a browser page. It runs inside a controller of the host's, so the
 host's own sign-in decides who is approving. Name that controller, the method on it that signs a
@@ -220,6 +226,16 @@ The partial takes the `person` and the `submit_url` its buttons send a `connecti
 PATCH. The action is built with `new(person:, account:, values:)`, and `call` answers a result
 whose `ok?` is false, with a `message`, when the connection is not the person's own. A
 disconnected connection's access and refresh tokens stop working at once.
+
+A host runs one task, on whatever schedule its job runner keeps, to remove sign-in records that
+can no longer be used: authorization codes past their ten minutes, connections whose access and
+refresh tokens have both expired, and clients over a day old with no connection.
+
+```sh
+bin/rails hub_kernel_mcp:prune
+```
+
+A connection whose access token or refresh token still works is never removed.
 
 ## Installation
 

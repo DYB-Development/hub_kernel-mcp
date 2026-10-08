@@ -1,8 +1,8 @@
 ---
 name: hub_kernel-mcp-info
-description: Use to learn what hub_kernel-mcp offers — serving a host's hubs as MCP tools, how tools are named and scoped, how a client such as Claude's connector screen finds the endpoint's sign-in, registers itself, is approved by a person through the browser, trades its code for an access token and a refresh token and later trades the refresh token for a new pair, how each sign-in step refuses a bad request or an unexpected error, how the host's sign-in finds the person a token acts for, how a person sees and disconnects the apps connected as them, and the vocabulary the install and develop locals assume.
+description: Use to learn what hub_kernel-mcp offers — serving a host's hubs as MCP tools, how tools are named and scoped, how a client such as Claude's connector screen finds the endpoint's sign-in, registers itself, is approved by a person through the browser, trades its code for an access token and a refresh token and later trades the refresh token for a new pair, how each sign-in step refuses a bad request or an unexpected error, how many clients one address may register in an hour, how the host's sign-in finds the person a token acts for, how a person sees and disconnects the apps connected as them, how expired sign-in records are removed, and the vocabulary the install and develop locals assume.
 tools: Read
-scope: hub MCP tools — serving the methods every hub a host serves, from hub_kernel-interface's one served list, as MCP tools at one JSON-RPC endpoint in a host Rails app, each call behind the host's own sign-in and hub_kernel-interface's permission check and account scope, with a boot check for hubs that cannot be served as tools, the OAuth discovery documents, 401 challenge and client registration that let a client such as Claude's connector screen find the endpoint's sign-in and register by itself, and the approval page where a person signed in to the host through the browser approves that client and is issued an authorization code, the token exchange that trades that code with its PKCE verifier for an access token lasting an hour and a refresh token, the refresh exchange that trades a refresh token for a new access token and a new refresh token and retires the one posted, and the lookup a host's sign-in calls to get the person a bearer token acts for, which records when the connection was last used, and the settings section a host registers with settings_hub that lists a person's connections with the app's name, when it connected and when it was last used, and disconnects one that is the person's own
+scope: hub MCP tools — serving the methods every hub a host serves, from hub_kernel-interface's one served list, as MCP tools at one JSON-RPC endpoint in a host Rails app, each call behind the host's own sign-in and hub_kernel-interface's permission check and account scope, with a boot check for hubs that cannot be served as tools, the OAuth discovery documents, 401 challenge and client registration that let a client such as Claude's connector screen find the endpoint's sign-in and register by itself, with each client recording the address it registered from and a configurable limit on how many clients one address may register per hour past which registration is refused, and the approval page where a person signed in to the host through the browser approves that client and is issued an authorization code, the token exchange that trades that code with its PKCE verifier for an access token lasting an hour and a refresh token, the refresh exchange that trades a refresh token for a new access token and a new refresh token and retires the one posted, and the lookup a host's sign-in calls to get the person a bearer token acts for, which records when the connection was last used, and the settings section a host registers with settings_hub that lists a person's connections with the app's name, when it connected and when it was last used, and disconnects one that is the person's own, and the prune task a host schedules with its own job runner that removes expired authorization codes, connections whose access and refresh tokens have both expired, and clients over a day old with no connection
 ---
 
 This local explains hub_kernel-mcp and makes no changes.
@@ -43,6 +43,13 @@ that lists each of the person's connections with the app's name, when it
 connected and when it was last used, and a Disconnect button for each. A
 disconnected app's tokens stop working at once.
 
+Registration needs no sign-in, so the gem keeps it and the records it leaves
+bounded. One address may register only a set number of clients in an hour, ten
+unless the host changes it. The gem also ships a prune task that removes
+authorization codes, connections and clients that can no longer be used. The
+gem does not run the task itself, so the host schedules it with its own job
+runner.
+
 ## Interface
 
 This local declares no entry points of its own.
@@ -50,9 +57,10 @@ This local declares no entry points of its own.
 - Adding the gem to a host, mounting the endpoint and the discovery documents,
   installing the client, authorization code and connection tables, configuring
   which controllers, person, account and sign-in methods and layout it uses,
-  running the boot check, calling the token lookup from the host's sign-in, and
-  registering the connections section and its disconnect action with
-  settings_hub are owned by the install local, `hub_kernel-mcp-install`.
+  setting the registration limit, running the boot check, calling the token
+  lookup from the host's sign-in, registering the connections section and its
+  disconnect action with settings_hub, and scheduling the prune task are owned
+  by the install local, `hub_kernel-mcp-install`.
 - The endpoint itself, the MCP requests it answers, the discovery documents,
   the challenge on a refused request, client registration, the approval page,
   the token exchange, the refresh exchange, how each of them refuses, and the
@@ -64,8 +72,10 @@ This local declares no entry points of its own.
 - To put hub_kernel-mcp into a Rails app, to let a connector screen sign in to
   it, to point the approval page at the host's browser sign-in and layout, to
   make the host's sign-in accept the access tokens this gem issues, to add the
-  connected apps section to the host's settings page, or to fix a host whose
-  boot check fails, use `hub_kernel-mcp-install`.
+  connected apps section to the host's settings page, to raise or lower how
+  many clients one address may register in an hour, to schedule the removal of
+  expired sign-in records, or to fix a host whose boot check fails, use
+  `hub_kernel-mcp-install`.
 - To change what the endpoint answers, add support for another MCP request,
   change how tools are listed, called or refused, change what the discovery
   documents and registration say, change what the approval page checks and
@@ -112,6 +122,10 @@ This local declares no entry points of its own.
   machine, and a registration with none or with any other address is refused
   with the reason. A registration body that is not valid JSON is refused as
   invalid client metadata.
+- **Registration limit** — each client records the address it registered
+  from. Once one address has registered as many clients in the last hour as the
+  limit allows, ten by default, its next registration is refused with status
+  429 and the reason, and no client is created.
 - **Browser side** — the approval page runs on a host controller meant for
   people in a browser, separate from the endpoint's controller. The host names
   that controller, the method that makes a person sign in, the method that
@@ -166,3 +180,8 @@ This local declares no entry points of its own.
   connection, so both of its tokens stop working at once. A connection that is
   not the person's own is left alone and the person is told it is not one of
   theirs.
+- **Prune** — the task that removes sign-in records nothing can use any more:
+  authorization codes past their ten minutes, connections whose access token
+  and refresh token have both expired, and clients registered over a day ago
+  that hold no connection and no authorization code. A connection with either
+  token still working is never removed. The gem never runs it on its own.
