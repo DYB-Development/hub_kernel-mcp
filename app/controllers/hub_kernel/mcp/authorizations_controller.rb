@@ -31,7 +31,7 @@ module HubKernel
       end
 
       def refuse_without_pkce
-        redirect_to_client(error: "invalid_request", error_description: "A PKCE challenge using S256 is required") unless params[:code_challenge_method] == "S256"
+        redirect_to_client(error: "invalid_request", error_description: "A PKCE challenge using S256 is required") unless params[:code_challenge].present? && params[:code_challenge_method] == "S256"
       end
 
       def redirect_to_client(answer)

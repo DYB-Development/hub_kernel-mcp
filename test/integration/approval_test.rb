@@ -54,6 +54,14 @@ class ApprovalTest < ActionDispatch::IntegrationTest
     assert_redirected_to "https://claude.ai/callback?error=invalid_request&error_description=A+PKCE+challenge+using+S256+is+required&state=xyz"
   end
 
+  test "an approval request with no PKCE challenge is refused" do
+    sign_in "sam"
+
+    get "/mcp/authorize", params: @approval.except(:code_challenge)
+
+    assert_redirected_to "https://claude.ai/callback?error=invalid_request&error_description=A+PKCE+challenge+using+S256+is+required&state=xyz"
+  end
+
   private
 
   def sign_in(person) = get("/sign_in", params: { person: person, return_to: "/" })
