@@ -18,7 +18,7 @@ module HubKernel
       end
 
       def self.refresh(refresh_token, client:)
-        connection = find_by(refresh_token_digest: digest(refresh_token.to_s), client: client)
+        connection = where(refresh_expires_at: Time.current..).find_by(refresh_token_digest: digest(refresh_token.to_s), client: client)
         return unless connection
 
         tokens = new_tokens

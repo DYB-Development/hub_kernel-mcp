@@ -43,4 +43,11 @@ class HubKernel::Mcp::ConnectionTest < ActiveSupport::TestCase
 
     assert_nil HubKernel::Mcp::Connection.refresh(tokens.refresh_token, client: other)
   end
+
+  test "a refresh token unused for ninety days gives nothing" do
+    tokens = HubKernel::Mcp::Connection.issue(person: Person.new("sam"), client: @client)
+    travel 90.days + 1.second
+
+    assert_nil HubKernel::Mcp::Connection.refresh(tokens.refresh_token, client: @client)
+  end
 end
