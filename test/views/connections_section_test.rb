@@ -1,6 +1,8 @@
 require "test_helper"
 
-class ConnectionsSectionTest < ActiveSupport::TestCase
+class ConnectionsSectionTest < ActionView::TestCase
+  helper KeystoneUiHelper
+
   setup do
     travel_to Time.utc(2026, 10, 8, 9, 30)
     claude = HubKernel::Mcp::Client.create!(name: "Claude", redirect_uris: [ "https://claude.ai/callback" ])
@@ -22,9 +24,13 @@ class ConnectionsSectionTest < ActiveSupport::TestCase
     assert_equal [ "/settings/connections", "patch", HubKernel::Mcp::Connection.of(Person.new("sam")).sole.id.to_s ], [ form["action"], form.at_css("input[name=_method]")["value"], form.at_css("input[name=connection_id]")["value"] ]
   end
 
+  test "each connection is shown in its own keystone panel" do
+    assert_equal [ "Claude" ], section_for(Person.new("sam")).css("li > div.ks-panel strong").map(&:text)
+  end
+
   private
 
   def section_for(person)
-    Nokogiri::HTML.fragment(ApplicationController.render(partial: "hub_kernel/mcp/connections", locals: { person: person, account: "acme", selection: {}, submit_url: "/settings/connections" }))
+    Nokogiri::HTML.fragment(render(partial: "hub_kernel/mcp/connections", locals: { person: person, account: "acme", selection: {}, submit_url: "/settings/connections" }))
   end
 end
