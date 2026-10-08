@@ -20,6 +20,12 @@ class TokenTest < ActionDispatch::IntegrationTest
     assert_refused
   end
 
+  test "a code posted with a redirect address other than the one it was approved for is refused and gives no token" do
+    post "/mcp/token", params: @exchange.merge(redirect_uri: "https://claude.ai/other")
+
+    assert_refused
+  end
+
   private
 
   def assert_refused
