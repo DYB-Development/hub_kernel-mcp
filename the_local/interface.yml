@@ -1,8 +1,10 @@
-scope: hub MCP tools — serving the methods every hub a host serves, from hub_kernel-interface's one served list, as MCP tools at one JSON-RPC endpoint in a host Rails app, each call behind the host's own sign-in and hub_kernel-interface's permission check and account scope, with a boot check for hubs that cannot be served as tools
+scope: hub MCP tools — serving the methods every hub a host serves, from hub_kernel-interface's one served list, as MCP tools at one JSON-RPC endpoint in a host Rails app, each call behind the host's own sign-in and hub_kernel-interface's permission check and account scope, with a boot check for hubs that cannot be served as tools, and the OAuth discovery documents, 401 challenge and client registration that let a client such as Claude's connector screen find the endpoint's sign-in and register by itself
 
 install:
   - gem "hub_kernel-mcp"
   - mount HubKernel::Mcp::Engine
+  - mount HubKernel::Mcp::Discovery
+  - bin/rails hub_kernel_mcp:install:migrations
   - HubKernel::Mcp.base_controller=
   - HubKernel::Mcp.person_method=
   - HubKernel::Mcp.account_method=
@@ -15,10 +17,20 @@ develop:
   - ping
   - tools/list
   - tools/call
+  - POST /register
+  - WWW-Authenticate
+  - GET /.well-known/oauth-protected-resource
+  - GET /.well-known/oauth-authorization-server
 
 sources:
   - lib/hub_kernel/mcp.rb
   - lib/hub_kernel/mcp/engine.rb
+  - lib/hub_kernel/mcp/discovery.rb
+  - lib/hub_kernel/mcp/challenge.rb
   - config/routes.rb
+  - db/migrate/20261007000000_create_hub_kernel_mcp_clients.rb
+  - app/models/hub_kernel/mcp/client.rb
   - app/controllers/hub_kernel/mcp/messages_controller.rb
+  - app/controllers/hub_kernel/mcp/discovery_controller.rb
+  - app/controllers/hub_kernel/mcp/registrations_controller.rb
   - README.md

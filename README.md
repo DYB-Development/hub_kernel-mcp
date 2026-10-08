@@ -75,6 +75,43 @@ naming a hub the host does not serve are all answered with the same JSON-RPC err
 
 A caller the host's sign-in refuses is refused before any hub is asked.
 
+## Signing in from a connector screen
+
+A client such as Claude's connector screen finds the endpoint's sign-in by itself and
+registers there, so a person only pastes the endpoint's address. Install the gem's migrations,
+then mount its discovery documents at the site root beside the endpoint:
+
+```sh
+bin/rails hub_kernel_mcp:install:migrations db:migrate
+```
+
+```ruby
+mount HubKernel::Mcp::Engine => "/mcp"
+mount HubKernel::Mcp::Discovery => "/.well-known"
+```
+
+Every 401 from the endpoint carries a `WWW-Authenticate` header naming where the endpoint is
+described:
+
+```
+Bearer resource_metadata="https://example.com/.well-known/oauth-protected-resource/mcp"
+```
+
+That document names the endpoint's address and its sign-in, the site root. The sign-in's own
+document, at `/.well-known/oauth-authorization-server`, names the registration, approval and
+token addresses under the endpoint's address, such as `/mcp/register`, and says a client must
+use PKCE with SHA-256.
+
+A client registers by posting its name and redirect addresses to the registration address:
+
+```json
+{ "client_name": "Claude", "redirect_uris": [ "https://claude.ai/api/mcp/auth_callback" ] }
+```
+
+It is answered with status 201 and a client id. A registration with no redirect address, or
+with one that is neither HTTPS nor on the client's own machine, is answered with status 400,
+`invalid_redirect_uri`, and the reason.
+
 A `ping` is answered with an empty result. Every other request the endpoint cannot answer gets
 a JSON-RPC error:
 
