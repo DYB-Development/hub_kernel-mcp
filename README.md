@@ -154,15 +154,27 @@ the redirect address it was approved for and its client id:
 grant_type=authorization_code&code=<code>&code_verifier=<verifier>&redirect_uri=<redirect>&client_id=<client id>
 ```
 
-It is answered with an access token that lasts an hour:
+It is answered with an access token that lasts an hour and a refresh token:
 
 ```json
-{ "access_token": "<token>", "token_type": "Bearer", "expires_in": 3600 }
+{ "access_token": "<token>", "token_type": "Bearer", "expires_in": 3600, "refresh_token": "<refresh token>" }
 ```
 
 A code is used up by the trade. A code posted with a verifier that does not match its challenge,
 with another redirect address, a second time, or more than ten minutes after it was made is
 answered with status 400 and `invalid_grant`, and gives no token.
+
+When the access token expires, the client posts its refresh token and client id to the same
+address:
+
+```
+grant_type=refresh_token&refresh_token=<refresh token>&client_id=<client id>
+```
+
+It is answered the same way, with a new access token and a new refresh token, and the refresh
+token it posted stops working. A refresh token posted by a client other than the one it was
+issued to, one already traded, or one unused for ninety days is answered with status 400 and
+`invalid_grant`, and the person signs in again.
 
 The client then sends the token on every request to the endpoint as `Authorization: Bearer
 <token>`. The host's own sign-in, the base controller the endpoint inherits from, asks the gem
