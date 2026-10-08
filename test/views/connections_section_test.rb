@@ -28,6 +28,10 @@ class ConnectionsSectionTest < ActionView::TestCase
     assert_equal [ "No apps are connected." ], section_for(Person.new("kim")).css(".ks-table tbody td").map { |cell| cell.text.squish }
   end
 
+  test "the table sits under a keystone section titled Connected apps" do
+    assert_equal [ "Connected apps" ], section_for(Person.new("sam")).css("h2.ks-section-title").map(&:text)
+  end
+
   private
 
   def section_for(person)
