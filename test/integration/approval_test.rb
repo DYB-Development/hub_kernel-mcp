@@ -91,6 +91,14 @@ class ApprovalTest < ActionDispatch::IntegrationTest
     assert_equal [ [ RuntimeError ], 500, "Signing in failed unexpectedly" ], [ reports.map { |report| report.error.class }, response.status, css_select("h1").text ]
   end
 
+  test "the approval form is posted by the browser itself, so a Turbo host follows its redirect to the client" do
+    sign_in "sam"
+
+    get "/mcp/authorize", params: @approval
+
+    assert_equal "false", css_select("form").sole["data-turbo"]
+  end
+
   private
 
   def sign_in(person) = get("/sign_in", params: { person: person, return_to: "/" })
