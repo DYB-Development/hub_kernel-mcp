@@ -12,4 +12,10 @@ class HubKernel::Mcp::DisconnectTest < ActiveSupport::TestCase
 
     assert_equal [ true, nil, nil ], [ result.ok?, HubKernel::Mcp::Connection.person_for(@tokens.access_token), HubKernel::Mcp::Connection.refresh(@tokens.refresh_token, client: @client) ]
   end
+
+  test "a person cannot disconnect a connection acting for someone else" do
+    result = HubKernel::Mcp::Disconnect.new(person: Person.new("alex"), account: "acme", values: { connection_id: @connection.id.to_s }).call
+
+    assert_equal [ false, "That connection is not one of yours", Person.new("sam") ], [ result.ok?, result.message, HubKernel::Mcp::Connection.person_for(@tokens.access_token) ]
+  end
 end

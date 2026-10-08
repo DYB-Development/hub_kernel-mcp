@@ -11,8 +11,8 @@ module HubKernel
       end
 
       def call
-        Connection.of(@person).where(id: @values[:connection_id]).delete_all
-        Result.new(message: nil)
+        disconnected = Connection.of(@person).where(id: @values[:connection_id]).delete_all
+        Result.new(message: disconnected.zero? ? "That connection is not one of yours" : nil)
       end
     end
   end
