@@ -2,7 +2,7 @@
 name: hub_kernel-mcp-install
 description: Use to hook hub_kernel-mcp into a project — adding the gem, naming the controller the endpoint inherits from and the person and account methods on it, naming the browser controller, sign-in method, person method and layout the approval page runs with, running the boot check after the served list is set, mounting the engine, and, for sign-in from a connector screen, installing the migrations, mounting the discovery documents, and having the host's sign-in look up the person an access token acts for.
 tools: Bash, Read, Edit
-scope: hub MCP tools — serving the methods every hub a host serves, from hub_kernel-interface's one served list, as MCP tools at one JSON-RPC endpoint in a host Rails app, each call behind the host's own sign-in and hub_kernel-interface's permission check and account scope, with a boot check for hubs that cannot be served as tools, the OAuth discovery documents, 401 challenge and client registration that let a client such as Claude's connector screen find the endpoint's sign-in and register by itself, and the approval page where a person signed in to the host through the browser approves that client and is issued an authorization code, the token exchange that trades that code with its PKCE verifier for an access token lasting an hour, and the lookup a host's sign-in calls to get the person a bearer token acts for
+scope: hub MCP tools — serving the methods every hub a host serves, from hub_kernel-interface's one served list, as MCP tools at one JSON-RPC endpoint in a host Rails app, each call behind the host's own sign-in and hub_kernel-interface's permission check and account scope, with a boot check for hubs that cannot be served as tools, the OAuth discovery documents, 401 challenge and client registration that let a client such as Claude's connector screen find the endpoint's sign-in and register by itself, and the approval page where a person signed in to the host through the browser approves that client and is issued an authorization code, the token exchange that trades that code with its PKCE verifier for an access token lasting an hour and a refresh token, the refresh exchange that trades a refresh token for a new access token and a new refresh token and retires the one posted, and the lookup a host's sign-in calls to get the person a bearer token acts for
 ---
 
 This local follows these steps exactly and invents none. Where a step names a
@@ -25,17 +25,19 @@ a signed-in person's behalf.
   `config/routes.rb` at the path given. The path answers POST with JSON-RPC and
   answers GET with status 405. A client registers at `<path>/register`, a person
   approves it at `<path>/authorize`, the client trades the approval's code for an
-  access token at `<path>/token`, and every 401 the endpoint answers carries a
+  access token and a refresh token at `<path>/token` and later trades the
+  refresh token there for a new pair, and every 401 the endpoint answers carries a
   `WWW-Authenticate` header pointing at the discovery documents.
 - `mount HubKernel::Mcp::Discovery` — mounts the two OAuth discovery documents
   in the host's `config/routes.rb`. It must be mounted at `"/.well-known"`,
   since the endpoint's 401 header names that path.
-- `bin/rails hub_kernel_mcp:install:migrations` — copies the gem's three
+- `bin/rails hub_kernel_mcp:install:migrations` — copies the gem's four
   migrations into the host's `db/migrate`. They create the
   `hub_kernel_mcp_clients` table, which holds each client that registers, the
   `hub_kernel_mcp_authorization_codes` table, which holds each code the
   approval page issues, and the `hub_kernel_mcp_connections` table, which holds
-  each access token issued for a code.
+  each access token issued for a code, and then add the refresh token's columns
+  to `hub_kernel_mcp_connections`.
 - `HubKernel::Mcp.base_controller=` — the name, as a String, of the host
   controller the endpoint inherits from. Its before-actions, including sign-in,
   run before any hub is asked. Defaults to `"ActionController::API"`, which has
@@ -66,8 +68,9 @@ a signed-in person's behalf.
   `HubKernel::Interface::UnservableHubError`, so rescuing either catches it.
 - `HubKernel::Mcp::Connection.person_for` — takes the bearer token a client
   sends, as a String, and returns the person who approved the client the token
-  was issued to. Returns `nil` for a token that is unknown or more than an hour
-  old. The host's sign-in on the base controller calls it.
+  was issued to. Returns `nil` for a token that is unknown, more than an hour
+  old, or replaced by a refresh. The host's sign-in on the base controller
+  calls it.
 
 ## How to use it
 
@@ -165,9 +168,9 @@ a signed-in person's behalf.
    bin/rails hub_kernel_mcp:install:migrations db:migrate
    ```
 
-   This adds three migrations to the host's `db/migrate` and the
+   This adds four migrations to the host's `db/migrate` and the
    `hub_kernel_mcp_clients`, `hub_kernel_mcp_authorization_codes` and
-   `hub_kernel_mcp_connections` tables to `db/schema.rb`. Commit all four files.
+   `hub_kernel_mcp_connections` tables to `db/schema.rb`. Commit all five files.
 
 10. Add the discovery mount to `config/routes.rb`, at the site root beside the
     endpoint's mount, at exactly `"/.well-known"`:
@@ -248,11 +251,16 @@ a signed-in person's behalf.
   `Authorization: Bearer unknown`, which should answer 401.
 - Run `bin/rails hub_kernel_mcp:install:migrations` again after upgrading the
   gem, then `db:migrate`. It copies only migrations the host does not have yet.
-  A host that installed an earlier version with two migrations gets the
-  `hub_kernel_mcp_connections` migration this way, and the token address
-  answers with an error until it is run.
-- An access token lasts one hour, and the gem issues no refresh token, so a
-  client signs in again through the approval page after it expires.
+  A host that installed an earlier version with two or three migrations gets
+  the missing ones this way, and the token address answers with an error until
+  they are run.
+- An access token lasts one hour. A refresh token lasts ninety days from when
+  it was issued, works only for the client it was issued to, and works once:
+  trading it retires it and the access token issued with it. A client that
+  lets its refresh token expire signs in again through the approval page.
+- A token issued before the refresh token migration was run has no refresh
+  token, so its client signs in again through the approval page once the
+  access token expires.
 - Out of scope: choosing which hubs are served and setting permissions and
   account scope, which belong to hub_kernel-interface, and changing what the
   endpoint, the discovery documents or the approval page answer, which belongs
