@@ -115,6 +115,14 @@ class ApprovalTest < ActionDispatch::IntegrationTest
     assert_equal "ks-button ks-button-primary ks-button-md", decision_form("approve").at_css("button")["class"]
   end
 
+  test "Deny is keystone_ui's secondary button in a form that sends deny" do
+    sign_in "sam"
+
+    get "/mcp/authorize", params: @approval
+
+    assert_equal "ks-button ks-button-secondary ks-button-md", decision_form("deny").at_css("button")["class"]
+  end
+
   private
 
   def decision_form(decision) = css_select("form.ks-form").find { |form| form.at_css("input[name=decision]")&.[]("value") == decision }

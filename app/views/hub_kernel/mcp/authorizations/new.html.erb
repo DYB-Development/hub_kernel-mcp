@@ -8,9 +8,10 @@
   <%= ui_button(label: "Approve") %>
 <% end %>
 
-<%= form_with url: request.path, method: :post, data: { turbo: false } do |form| %>
+<%= ui_form(action: request.path, data: { turbo: false }) do %>
   <% approval_params.each do |name, value| %>
     <%= hidden_field_tag name, value %>
   <% end %>
-  <%= form.button "Deny", name: "decision", value: "deny" %>
+  <%= hidden_field_tag :decision, "deny" %>
+  <%= ui_button(label: "Deny", variant: :secondary) %>
 <% end %>
