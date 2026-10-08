@@ -71,6 +71,12 @@ class TokenTest < ActionDispatch::IntegrationTest
     assert_equal [ 400, { "error" => "invalid_grant", "error_description" => "The refresh token is unknown, used, unused for ninety days, or belongs to another client" } ], [ response.status, response.parsed_body ]
   end
 
+  test "a grant type the token address does not offer is answered with the OAuth error and why" do
+    post "/mcp/token", params: @exchange.merge(grant_type: "password")
+
+    assert_equal [ 400, { "error" => "unsupported_grant_type", "error_description" => "The token address takes authorization_code or refresh_token" }, 0 ], [ response.status, response.parsed_body, HubKernel::Mcp::Connection.count ]
+  end
+
   private
 
   def assert_refused

@@ -5,14 +5,22 @@ module HubKernel
       UNUSABLE_REFRESH_TOKEN = "The refresh token is unknown, used, unused for ninety days, or belongs to another client".freeze
 
       def create
-        refreshing = params[:grant_type] == "refresh_token"
-        tokens = refreshing ? refreshed : exchanged
-        return render(status: :bad_request, json: { error: "invalid_grant", error_description: refreshing ? UNUSABLE_REFRESH_TOKEN : UNUSABLE_CODE }) unless tokens
+        case params[:grant_type]
+        when "authorization_code" then answer(exchanged, UNUSABLE_CODE)
+        when "refresh_token" then answer(refreshed, UNUSABLE_REFRESH_TOKEN)
+        else refuse("unsupported_grant_type", "The token address takes authorization_code or refresh_token")
+        end
+      end
+
+      private
+
+      def answer(tokens, refusal)
+        return refuse("invalid_grant", refusal) unless tokens
 
         render json: { access_token: tokens.access_token, token_type: "Bearer", expires_in: Connection::LIFETIME.to_i, refresh_token: tokens.refresh_token }
       end
 
-      private
+      def refuse(error, description) = render(status: :bad_request, json: { error: error, error_description: description })
 
       def exchanged
         code = AuthorizationCode.find_by(code_digest: AuthorizationCode.digest(params[:code].to_s))
