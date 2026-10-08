@@ -8,7 +8,7 @@ module HubKernel
       layout -> { HubKernel::Mcp.browser_layout }
 
       before_action { send(HubKernel::Mcp.sign_in_method) }
-      before_action :refuse_unknown_client, :refuse_unregistered_redirect
+      before_action :refuse_missing_values, :refuse_unknown_client, :refuse_unregistered_redirect
       before_action :refuse_without_pkce
 
       helper_method :approval_params
@@ -24,6 +24,11 @@ module HubKernel
       end
 
       private
+
+      def refuse_missing_values
+        missing = %i[client_id redirect_uri].find { |name| params[name].blank? }
+        refuse_on_page("The approval request is missing #{missing}") if missing
+      end
 
       def refuse_unknown_client
         @client = Client.find_by(uid: params[:client_id])

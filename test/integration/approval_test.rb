@@ -70,6 +70,17 @@ class ApprovalTest < ActionDispatch::IntegrationTest
     assert_equal [ 400, nil, "The app asking to connect is not registered" ], [ response.status, response.location, css_select("h1").text ]
   end
 
+  test "an approval request missing its client id or redirect address shows an error page naming it and sends the person nowhere" do
+    sign_in "sam"
+
+    pages = %i[client_id redirect_uri].map do |missing|
+      get "/mcp/authorize", params: @approval.except(missing)
+      [ response.status, response.location, css_select("h1").text ]
+    end
+
+    assert_equal [ [ 400, nil, "The approval request is missing client_id" ], [ 400, nil, "The approval request is missing redirect_uri" ] ], pages
+  end
+
   private
 
   def sign_in(person) = get("/sign_in", params: { person: person, return_to: "/" })
