@@ -12,4 +12,16 @@ class ApprovalTest < ActionDispatch::IntegrationTest
 
     assert_redirected_to "http://www.example.com/mcp/authorize?#{URI.encode_www_form(@approval)}"
   end
+
+  test "a signed-in person sees the app asking to connect with an Approve and a Deny button in the host's layout" do
+    sign_in "sam"
+
+    get "/mcp/authorize", params: @approval
+
+    assert_equal [ "Dummy", "Claude wants to connect as you", [ "Approve", "Deny" ] ], [ css_select("title").text, css_select("h1").text, css_select("button").map(&:text) ]
+  end
+
+  private
+
+  def sign_in(person) = get("/sign_in", params: { person: person, return_to: "/" })
 end
