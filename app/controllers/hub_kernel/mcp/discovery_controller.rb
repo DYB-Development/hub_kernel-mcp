@@ -10,7 +10,7 @@ module HubKernel
           authorization_endpoint: "#{endpoint_url}/authorize",
           token_endpoint: "#{endpoint_url}/token",
           response_types_supported: [ "code" ],
-          grant_types_supported: [ "authorization_code" ],
+          grant_types_supported: [ "authorization_code", "refresh_token" ],
           token_endpoint_auth_methods_supported: [ "none" ],
           code_challenge_methods_supported: [ "S256" ]
         }
