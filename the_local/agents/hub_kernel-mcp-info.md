@@ -1,8 +1,8 @@
 ---
 name: hub_kernel-mcp-info
-description: Use to learn what hub_kernel-mcp offers — serving a host's hubs as MCP tools, how tools are named and scoped, and the vocabulary the install and develop locals assume.
+description: Use to learn what hub_kernel-mcp offers — serving a host's hubs as MCP tools, how tools are named and scoped, how a client such as Claude's connector screen finds the endpoint's sign-in and registers itself, and the vocabulary the install and develop locals assume.
 tools: Read
-scope: hub MCP tools — serving the methods every hub a host serves, from hub_kernel-interface's one served list, as MCP tools at one JSON-RPC endpoint in a host Rails app, each call behind the host's own sign-in and hub_kernel-interface's permission check and account scope, with a boot check for hubs that cannot be served as tools
+scope: hub MCP tools — serving the methods every hub a host serves, from hub_kernel-interface's one served list, as MCP tools at one JSON-RPC endpoint in a host Rails app, each call behind the host's own sign-in and hub_kernel-interface's permission check and account scope, with a boot check for hubs that cannot be served as tools, and the OAuth discovery documents, 401 challenge and client registration that let a client such as Claude's connector screen find the endpoint's sign-in and register by itself
 ---
 
 This local explains hub_kernel-mcp and makes no changes.
@@ -22,22 +22,31 @@ permission check and account scope, so a tool can do nothing the signed-in
 person could not already do. A boot check refuses to start a host whose served
 hubs cannot be turned into valid tool names.
 
+The gem also lets a client set itself up from the endpoint's address alone. A
+refused request tells the client where the endpoint is described, two discovery
+documents name the endpoint's sign-in and its registration address, and the
+client registers itself there with its name and redirect addresses. A person
+using Claude's connector screen only pastes the endpoint's address.
+
 ## Interface
 
 This local declares no entry points of its own.
 
-- Adding the gem to a host, mounting the endpoint, configuring which controller
-  and which person and account methods it uses, and running the boot check are
-  owned by the install local, `hub_kernel-mcp-install`.
-- The endpoint itself and the MCP requests it answers are owned by the develop
-  local, `hub_kernel-mcp-develop`.
+- Adding the gem to a host, mounting the endpoint and the discovery documents,
+  installing the client table, configuring which controller and which person
+  and account methods it uses, and running the boot check are owned by the
+  install local, `hub_kernel-mcp-install`.
+- The endpoint itself, the MCP requests it answers, the discovery documents,
+  the challenge on a refused request, and client registration are owned by the
+  develop local, `hub_kernel-mcp-develop`.
 
 ## How to use it
 
-- To put hub_kernel-mcp into a Rails app, or to fix a host whose boot check
-  fails, use `hub_kernel-mcp-install`.
-- To change what the endpoint answers, add support for another MCP request, or
-  change how tools are listed, called or refused, use `hub_kernel-mcp-develop`.
+- To put hub_kernel-mcp into a Rails app, to let a connector screen sign in to
+  it, or to fix a host whose boot check fails, use `hub_kernel-mcp-install`.
+- To change what the endpoint answers, add support for another MCP request,
+  change how tools are listed, called or refused, or change what the discovery
+  documents and registration say, use `hub_kernel-mcp-develop`.
 - To decide which hubs are served at all, or to change permissions and account
   scope, work in hub_kernel-interface, which owns the served list and those
   checks.
@@ -64,3 +73,18 @@ This local declares no entry points of its own.
   as the same JSON-RPC error, `Unknown tool`, so a caller cannot tell the two
   apart. An unexpected error is reported to the host's error reporting and its
   message is never sent to the client.
+- **Challenge** — the header added to every 401 the endpoint returns, pointing
+  the client at the document that describes the endpoint.
+- **Discovery documents** — two OAuth documents served at the site root. The
+  resource document names the endpoint's address and its sign-in, which is the
+  site root. The sign-in document names the registration, approval and token
+  addresses under the endpoint's address, and requires PKCE with SHA-256 and no
+  client secret.
+- **Client and registration** — a client is an app that registered itself by
+  posting its name and redirect addresses, and is answered with a client id.
+  Every redirect address must be HTTPS, or plain HTTP on the client's own
+  machine, and a registration with none or with any other address is refused
+  with the reason.
+- **Approval and token addresses** — the sign-in document names them, but this
+  gem does not answer them yet, so a registered client cannot finish signing in
+  through this gem alone.

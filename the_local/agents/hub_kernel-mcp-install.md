@@ -1,8 +1,8 @@
 ---
 name: hub_kernel-mcp-install
-description: Use to hook hub_kernel-mcp into a project — adding the gem, naming the controller the endpoint inherits from and the person and account methods on it, running the boot check after the served list is set, and mounting the engine.
+description: Use to hook hub_kernel-mcp into a project — adding the gem, naming the controller the endpoint inherits from and the person and account methods on it, running the boot check after the served list is set, mounting the engine, and, for sign-in from a connector screen, installing the client migration and mounting the discovery documents.
 tools: Bash, Read, Edit
-scope: hub MCP tools — serving the methods every hub a host serves, from hub_kernel-interface's one served list, as MCP tools at one JSON-RPC endpoint in a host Rails app, each call behind the host's own sign-in and hub_kernel-interface's permission check and account scope, with a boot check for hubs that cannot be served as tools
+scope: hub MCP tools — serving the methods every hub a host serves, from hub_kernel-interface's one served list, as MCP tools at one JSON-RPC endpoint in a host Rails app, each call behind the host's own sign-in and hub_kernel-interface's permission check and account scope, with a boot check for hubs that cannot be served as tools, and the OAuth discovery documents, 401 challenge and client registration that let a client such as Claude's connector screen find the endpoint's sign-in and register by itself
 ---
 
 This local follows these steps exactly and invents none. Where a step names a
@@ -22,7 +22,15 @@ person's behalf.
   `hub_kernel-interface` `~> 0.6`.
 - `mount HubKernel::Mcp::Engine` — mounts the endpoint in the host's
   `config/routes.rb` at the path given. The path answers POST with JSON-RPC and
-  answers GET with status 405.
+  answers GET with status 405. A client registers at `<path>/register`, and
+  every 401 the endpoint answers carries a `WWW-Authenticate` header pointing at
+  the discovery documents.
+- `mount HubKernel::Mcp::Discovery` — mounts the two OAuth discovery documents
+  in the host's `config/routes.rb`. It must be mounted at `"/.well-known"`,
+  since the endpoint's 401 header names that path.
+- `bin/rails hub_kernel_mcp:install:migrations` — copies the gem's migration
+  into the host's `db/migrate`. It creates the `hub_kernel_mcp_clients` table,
+  which holds each client that registers.
 - `HubKernel::Mcp.base_controller=` — the name, as a String, of the host
   controller the endpoint inherits from. Its before-actions, including sign-in,
   run before any hub is asked. Defaults to `"ActionController::API"`, which has
@@ -102,6 +110,36 @@ person's behalf.
    mount HubKernel::Mcp::Engine => "/mcp"
    ```
 
+7. Ask the developer whether a client such as Claude's connector screen should
+   find the endpoint's sign-in and register by itself, so a person only pastes
+   the endpoint's address. If not, stop here and skip steps 8 to 10.
+
+8. Copy the gem's migration into the host and run it:
+
+   ```
+   bin/rails hub_kernel_mcp:install:migrations db:migrate
+   ```
+
+   This adds a migration to the host's `db/migrate` and the
+   `hub_kernel_mcp_clients` table to `db/schema.rb`. Commit both.
+
+9. Add the discovery mount to `config/routes.rb`, at the site root beside the
+   endpoint's mount, at exactly `"/.well-known"`:
+
+   ```ruby
+   mount HubKernel::Mcp::Engine => "/mcp"
+   mount HubKernel::Mcp::Discovery => "/.well-known"
+   ```
+
+   If the host already routes anything under `/.well-known`, show the developer
+   those routes and ask how to combine them before adding the mount.
+
+10. Check how the base controller from step 2 refuses a caller who is not
+    signed in. A connector screen finds the sign-in only from a response with
+    status 401. If the controller redirects to a sign-in page or answers any
+    other status, tell the developer, and ask whether to change it to answer
+    401 for this endpoint.
+
 ## Conventions
 
 - After installing, boot the app or run `bin/rails runner "HubKernel::Mcp.check!"`.
@@ -116,6 +154,18 @@ person's behalf.
 - Run the check again whenever the served list changes or a hub gains a method.
 - A change to `config/initializers/hub_kernel_mcp.rb` takes effect only after
   the app restarts.
+- With discovery installed, check it with
+  `curl -i -X POST <host>/mcp` while signed out: the response should be 401 with
+  a `WWW-Authenticate` header naming
+  `<host>/.well-known/oauth-protected-resource/mcp`, and a GET to that address
+  should name the endpoint.
+- Run `bin/rails hub_kernel_mcp:install:migrations` again after upgrading the
+  gem, then `db:migrate`. It copies only migrations the host does not have yet.
+- The sign-in document names approval and token addresses under the endpoint's
+  path, `<path>/authorize` and `<path>/token`. This version of the gem does not
+  answer either, so a connector screen can register but cannot finish signing
+  in through the gem alone. Tell the developer this when they choose step 7.
 - Out of scope: choosing which hubs are served and setting permissions and
   account scope, which belong to hub_kernel-interface, and changing what the
-  endpoint answers, which belongs to `hub_kernel-mcp-develop`.
+  endpoint or the discovery documents answer, which belongs to
+  `hub_kernel-mcp-develop`.

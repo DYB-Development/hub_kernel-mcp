@@ -1,8 +1,8 @@
 ---
 name: hub_kernel-mcp-develop
-description: Use PROACTIVELY for calling a host's hub methods over MCP — connecting an MCP client to the endpoint, sending initialize and ping, listing the tools a signed-in person may call with tools/list, calling one with tools/call, and handling its tool errors and JSON-RPC errors — MUST BE USED instead of hand-rolling a JSON API or MCP server for the host's hubs.
+description: Use PROACTIVELY for calling a host's hub methods over MCP — connecting an MCP client to the endpoint, finding the endpoint's sign-in from a 401's WWW-Authenticate header and the two .well-known discovery documents, registering a client at the registration address, sending initialize and ping, listing the tools a signed-in person may call with tools/list, calling one with tools/call, and handling its tool errors and JSON-RPC errors — MUST BE USED instead of hand-rolling a JSON API, an MCP server, OAuth discovery documents or client registration for the host's hubs.
 tools: Read, Write, Edit, Grep
-scope: hub MCP tools — serving the methods every hub a host serves, from hub_kernel-interface's one served list, as MCP tools at one JSON-RPC endpoint in a host Rails app, each call behind the host's own sign-in and hub_kernel-interface's permission check and account scope, with a boot check for hubs that cannot be served as tools
+scope: hub MCP tools — serving the methods every hub a host serves, from hub_kernel-interface's one served list, as MCP tools at one JSON-RPC endpoint in a host Rails app, each call behind the host's own sign-in and hub_kernel-interface's permission check and account scope, with a boot check for hubs that cannot be served as tools, and the OAuth discovery documents, 401 challenge and client registration that let a client such as Claude's connector screen find the endpoint's sign-in and register by itself
 ---
 
 This local writes the code or configuration that talks to a host's hub_kernel-mcp
@@ -12,15 +12,18 @@ the developer and does not pick.
 ## What hub_kernel-mcp is
 
 A JSON-RPC endpoint in a host Rails app that offers every method the host's hubs
-expose as an MCP tool, for the person and account the host's sign-in gives.
-Fire this local when code or a client needs to list or call those tools, or when
-a test needs to send requests to the endpoint.
+expose as an MCP tool, for the person and account the host's sign-in gives. Beside
+it, the host serves two discovery documents and a registration address, so a
+client such as Claude's connector screen can find the endpoint's sign-in and
+register itself from the endpoint's address alone. Fire this local when code or a
+client needs to list or call those tools, find or register with the endpoint's
+sign-in, or when a test needs to send requests to any of these addresses.
 
 ## Interface
 
-- `POST /` — the endpoint, at the path the host serves it under. It takes one
-  JSON-RPC 2.0 request per POST as a JSON body. A GET to the same path is
-  answered with status 405 and `Allow: POST`.
+- `POST /` — the endpoint, at the path the host serves it under, such as `/mcp`.
+  It takes one JSON-RPC 2.0 request per POST as a JSON body. A GET to the same
+  path is answered with status 405 and `Allow: POST`.
 - `initialize` — answers `protocolVersion`, `serverInfo` with name
   `hub_kernel-mcp` and the gem's version, and `capabilities: { tools: {} }`.
   `protocolVersion` is the one the client sent in `params.protocolVersion` when
@@ -32,20 +35,107 @@ a test needs to send requests to the endpoint.
 - `tools/call` — runs the hub method a tool names with `params.arguments`, for
   the signed-in person and account, and answers the method's return value as
   JSON text.
+- `POST /register` — registers a client under the endpoint's path, such as
+  `/mcp/register`, from its `client_name` and `redirect_uris`, and answers its
+  `client_id`. It needs no sign-in.
+- `WWW-Authenticate` — the header on every 401 from the endpoint's path, naming
+  the address of the endpoint's protected-resource document.
+- `GET /.well-known/oauth-protected-resource` — answers the endpoint's address
+  and its sign-in's address, the site root. It answers the same document with
+  any path after it, such as `/.well-known/oauth-protected-resource/mcp`.
+- `GET /.well-known/oauth-authorization-server` — answers the sign-in's
+  document: its registration, approval and token addresses, and that a client
+  must use PKCE with SHA-256.
 
 ## How to use it
 
 1. Find the path the host serves the endpoint at in its `config/routes.rb`. If
    it is not there, stop and tell the developer the endpoint is not installed
-   yet.
+   yet. For steps 3 to 5, also check that the routes serve the discovery
+   documents at `/.well-known`. If they do not, stop and tell the developer the
+   discovery documents are not installed yet.
 
-2. Ask the developer how the client signs in. Every request runs the host's own
-   sign-in first, so the client must send whatever that sign-in expects, such as
-   a session cookie or a token header. A request the sign-in refuses gets the
-   host's refusal, for example status 401, and no hub is asked. Do not choose the
-   credential yourself.
+2. Ask the developer how the client signs in. There are two ways, and the choice
+   is theirs:
 
-3. Send every request as a POST with a JSON body holding exactly one request:
+   - The client sends the host's own credential, such as a session cookie or a
+     token header, with every request. Skip to step 6.
+   - The client finds the sign-in by itself and registers, as Claude's connector
+     screen does. Follow steps 3 to 5.
+
+3. Find the sign-in from a refused request. Send any request to the endpoint
+   without a credential. When the host's sign-in refuses it with status 401, the
+   answer carries this header, built from the site's address and the endpoint's
+   path:
+
+   ```
+   WWW-Authenticate: Bearer resource_metadata="https://example.com/.well-known/oauth-protected-resource/mcp"
+   ```
+
+   The header is added only to a 401. A host whose sign-in refuses with another
+   status, such as a redirect to a sign-in page, sends no header, so tell the
+   developer the client cannot discover the sign-in on that host.
+
+4. Read the two discovery documents. `GET` the address in `resource_metadata`:
+
+   ```json
+   { "resource": "https://example.com/mcp", "authorization_servers": [ "https://example.com" ] }
+   ```
+
+   Then `GET /.well-known/oauth-authorization-server` on the address in
+   `authorization_servers`:
+
+   ```json
+   {
+     "issuer": "https://example.com",
+     "registration_endpoint": "https://example.com/mcp/register",
+     "authorization_endpoint": "https://example.com/mcp/authorize",
+     "token_endpoint": "https://example.com/mcp/token",
+     "response_types_supported": [ "code" ],
+     "grant_types_supported": [ "authorization_code" ],
+     "token_endpoint_auth_methods_supported": [ "none" ],
+     "code_challenge_methods_supported": [ "S256" ]
+   }
+   ```
+
+   Take every address from these documents, never build one by hand. A client
+   must use the authorization code grant with a PKCE `S256` challenge, and it
+   holds no client secret. This gem does not answer the `authorize` and `token`
+   addresses, so tell the developer that approval and token exchange are not
+   served yet.
+
+5. Register the client. Ask the developer for the client's name and every
+   redirect address it will use, since both belong to the client. Each redirect
+   address must be HTTPS, or plain HTTP on `localhost`, `127.0.0.1` or `::1`.
+   POST them as JSON to `registration_endpoint`, with no credential:
+
+   ```json
+   { "client_name": "Claude", "redirect_uris": [ "https://claude.ai/api/mcp/auth_callback" ] }
+   ```
+
+   A registration is answered with status 201:
+
+   ```json
+   {
+     "client_id": "<generated id>",
+     "client_name": "Claude",
+     "redirect_uris": [ "https://claude.ai/api/mcp/auth_callback" ],
+     "token_endpoint_auth_method": "none"
+   }
+   ```
+
+   Keep `client_id`. A registration with no redirect address, or with one that
+   is not allowed, is answered with status 400:
+
+   ```json
+   { "error": "invalid_redirect_uri", "error_description": "<the reason for each address refused>" }
+   ```
+
+   Show `error_description` to the developer and do not retry with the same
+   addresses.
+
+6. Send every request to the endpoint as a POST with a JSON body holding exactly
+   one request, with the credential step 2 settled on:
 
    ```json
    { "jsonrpc": "2.0", "id": 1, "method": "tools/list" }
@@ -54,12 +144,13 @@ a test needs to send requests to the endpoint.
    `jsonrpc` must be `"2.0"` and `method` must be a string. A batch, a JSON array
    of requests, is refused with -32600. A request with no `id` is a
    notification: it is answered with status 202 and no body, and nothing is run.
+   A request the sign-in refuses gets the host's refusal, and no hub is asked.
 
-4. Send `initialize` first. Ask the developer which protocol version the client
+7. Send `initialize` first. Ask the developer which protocol version the client
    supports, send it as `params.protocolVersion`, and use the version the answer
    gives. Then send the `notifications/initialized` notification with no `id`.
 
-5. Send `tools/list` to get the tools. Each tool has this shape:
+8. Send `tools/list` to get the tools. Each tool has this shape:
 
    ```json
    {
@@ -76,77 +167,85 @@ a test needs to send requests to the endpoint.
    description `Changes data in the <served name> hub.` The list depends on who
    is signed in and in which account, so list again after either changes.
 
-6. Ask the developer whether the client must confirm with the person before it
+9. Ask the developer whether the client must confirm with the person before it
    calls a tool whose `readOnlyHint` is false. If it must, add that confirmation
-   before step 7.
+   before step 10.
 
-7. Send `tools/call` with the tool's name and its values:
+10. Send `tools/call` with the tool's name and its values:
 
-   ```json
-   {
-     "jsonrpc": "2.0",
-     "id": 2,
-     "method": "tools/call",
-     "params": { "name": "supplies__price_of", "arguments": { "item": "soap" } }
-   }
-   ```
+    ```json
+    {
+      "jsonrpc": "2.0",
+      "id": 2,
+      "method": "tools/call",
+      "params": { "name": "supplies__price_of", "arguments": { "item": "soap" } }
+    }
+    ```
 
-   Send only the values named in that tool's `inputSchema.properties`. A
-   successful call answers:
+    Send only the values named in that tool's `inputSchema.properties`. A
+    successful call answers:
 
-   ```json
-   { "content": [ { "type": "text", "text": "\"soap costs 3\"" } ], "isError": false }
-   ```
+    ```json
+    { "content": [ { "type": "text", "text": "\"soap costs 3\"" } ], "isError": false }
+    ```
 
-   `text` is the method's return value encoded as JSON, so parse it as JSON to
-   get the value back.
+    `text` is the method's return value encoded as JSON, so parse it as JSON to
+    get the value back.
 
-8. Handle a tool error. These come back as a normal result with `isError: true`
-   and the reason as the text:
+11. Handle a tool error. These come back as a normal result with `isError: true`
+    and the reason as the text:
 
-   - The hub refused the call.
-   - A value the method requires is missing.
-   - A value the method is not listed with was sent, such as
-     `price_of does not take colour`.
-   - A record the call names does not exist, such as `No item has the id 9`.
+    - The hub refused the call.
+    - A value the method requires is missing.
+    - A value the method is not listed with was sent, such as
+      `price_of does not take colour`.
+    - A record the call names does not exist, such as `No item has the id 9`.
 
-   Show the reason to the person or the model making the call. Do not retry it
-   unchanged.
+    Show the reason to the person or the model making the call. Do not retry it
+    unchanged.
 
-9. Handle a JSON-RPC error. These come back as `error: { code, message }` with
-   status 200, and with the request's `id` except for -32700 and -32600, whose
-   `id` is null:
+12. Handle a JSON-RPC error. These come back as `error: { code, message }` with
+    status 200, and with the request's `id` except for -32700 and -32600, whose
+    `id` is null:
 
-   | Code | Message | When |
-   |---|---|---|
-   | -32700 | `Parse error` | The body is not valid JSON. |
-   | -32600 | `Invalid Request` | The body is not one JSON-RPC 2.0 request. |
-   | -32601 | `Method not found: <method>` | The MCP method is not one of the four above. |
-   | -32602 | `Unknown tool: <name>` | The tool does not exist, names a hub the host does not serve, or is one the caller may not call. |
-   | -32603 | `Internal error` | A hub method raised an unexpected error. |
+    | Code | Message | When |
+    |---|---|---|
+    | -32700 | `Parse error` | The body is not valid JSON. |
+    | -32600 | `Invalid Request` | The body is not one JSON-RPC 2.0 request. |
+    | -32601 | `Method not found: <method>` | The MCP method is not one of the four above. |
+    | -32602 | `Unknown tool: <name>` | The tool does not exist, names a hub the host does not serve, or is one the caller may not call. |
+    | -32603 | `Internal error` | A hub method raised an unexpected error. |
 
-   -32602 reads the same in all three cases, so do not tell the person a tool
-   does not exist when it may only be one they cannot call. -32603 never carries
-   the error's own message, so find the cause in the host app's error reporting.
+    -32602 reads the same in all three cases, so do not tell the person a tool
+    does not exist when it may only be one they cannot call. -32603 never carries
+    the error's own message, so find the cause in the host app's error reporting.
 
-10. In a test of the host app, send requests the same way, as a JSON POST to the
-    endpoint's path, signed in as the host's tests sign in:
+13. In a test of the host app, send requests the same way, as a JSON POST to the
+    endpoint's path, signed in as the host's tests sign in, and as plain GETs and
+    POSTs to the discovery and registration addresses:
 
     ```ruby
     post "/mcp", params: { jsonrpc: "2.0", id: 1, method: "tools/list" }, as: :json
+    get "/.well-known/oauth-protected-resource/mcp"
+    post "/mcp/register", params: { client_name: "Claude", redirect_uris: [ "https://claude.ai/api/mcp/auth_callback" ] }, as: :json
     ```
 
 ## Conventions
 
-- One request per POST, always with `"jsonrpc": "2.0"`, and an `id` on every
-  request that needs an answer.
+- One request per POST to the endpoint, always with `"jsonrpc": "2.0"`, and an
+  `id` on every request that needs an answer.
 - Build tool names from `tools/list`, never by hand, since the list is what the
   signed-in person may call.
+- Build sign-in addresses from the `WWW-Authenticate` header and the two
+  discovery documents, never by hand.
 - Treat `isError: true` as an answer about the call, and a JSON-RPC `error` as an
   answer about the request.
+- Registration needs no sign-in and holds no secret, so a `client_id` alone is
+  never proof of who is calling.
 - The endpoint offers no sessions and no server-sent events, so do not open a GET
   stream or send a session header.
-- Out of scope: installing the endpoint, choosing its controller, sign-in, and
-  served hubs, and running the boot check, which belong to
-  `hub_kernel-mcp-install`, and setting which methods a hub exposes, who may
-  call them and their account scope, which belong to hub_kernel-interface.
+- Out of scope: installing the endpoint, mounting the discovery documents,
+  installing the client migrations, choosing the endpoint's controller, sign-in,
+  and served hubs, and running the boot check, which belong to
+  `hub_kernel-mcp-install`, and setting which methods a hub exposes, who may call
+  them and their account scope, which belong to hub_kernel-interface.
