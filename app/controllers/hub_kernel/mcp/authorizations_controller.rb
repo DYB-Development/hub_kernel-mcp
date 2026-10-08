@@ -8,22 +8,26 @@ module HubKernel
       layout -> { HubKernel::Mcp.browser_layout }
 
       before_action { send(HubKernel::Mcp.sign_in_method) }
+      before_action :refuse_unregistered_redirect
 
       helper_method :approval_params
 
       def new
-        @client = Client.find_by!(uid: params[:client_id])
       end
 
       def create
-        client = Client.find_by!(uid: params[:client_id])
         return redirect_to_client(error: "access_denied") unless params[:decision] == "approve"
 
-        code = AuthorizationCode.issue(person: send(HubKernel::Mcp.browser_person_method), client: client, redirect_uri: params[:redirect_uri], code_challenge: params[:code_challenge])
+        code = AuthorizationCode.issue(person: send(HubKernel::Mcp.browser_person_method), client: @client, redirect_uri: params[:redirect_uri], code_challenge: params[:code_challenge])
         redirect_to_client(code: code)
       end
 
       private
+
+      def refuse_unregistered_redirect
+        @client = Client.find_by(uid: params[:client_id])
+        render :unregistered_redirect, status: :bad_request unless @client&.redirect_uris&.include?(params[:redirect_uri])
+      end
 
       def redirect_to_client(answer)
         uri = URI.parse(params[:redirect_uri])

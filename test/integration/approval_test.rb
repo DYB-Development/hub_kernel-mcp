@@ -38,6 +38,14 @@ class ApprovalTest < ActionDispatch::IntegrationTest
     assert_equal [ "https://claude.ai/callback?error=access_denied&state=xyz", 0 ], [ response.location, HubKernel::Mcp::AuthorizationCode.count ]
   end
 
+  test "an approval request naming a redirect address the client did not register shows an error page and sends the person nowhere" do
+    sign_in "sam"
+
+    get "/mcp/authorize", params: @approval.merge(redirect_uri: "https://elsewhere.example/callback")
+
+    assert_equal [ 400, nil, "This app asked to send you to an address it did not register" ], [ response.status, response.location, css_select("h1").text ]
+  end
+
   private
 
   def sign_in(person) = get("/sign_in", params: { person: person, return_to: "/" })
