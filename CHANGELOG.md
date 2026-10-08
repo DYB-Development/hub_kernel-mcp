@@ -2,6 +2,13 @@
 
 ## [Unreleased]
 
+## [0.9.1] - 2026-10-08
+
+### Changed
+- The connected apps list is one keystone_ui table under a section titled Connected apps, showing each app, when it connected and when it was last used.
+- Disconnect is an item in each row's action menu, where before it was a full-size danger button.
+- A person with no connected apps sees "No apps are connected." in the table.
+
 ## [0.9.0] - 2026-10-08
 
 ### Changed
