@@ -2,6 +2,11 @@
 
 ## [Unreleased]
 
+## [0.8.1] - 2026-10-08
+
+### Fixed
+- In a host that uses Turbo, Approve and Deny on the approval page take the person back to the client's redirect address, where before the page stayed put and the client never heard the answer.
+
 ## [0.8.0] - 2026-10-08
 
 ### Added
