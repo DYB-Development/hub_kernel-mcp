@@ -1,3 +1,4 @@
+require "base64"
 require "digest"
 require "securerandom"
 
@@ -17,6 +18,10 @@ module HubKernel
       def self.digest(code) = Digest::SHA256.hexdigest(code)
 
       def person = GlobalID::Locator.locate(person_gid)
+
+      def verifies?(verifier)
+        ActiveSupport::SecurityUtils.secure_compare(Base64.urlsafe_encode64(Digest::SHA256.digest(verifier.to_s), padding: false), code_challenge)
+      end
     end
   end
 end
