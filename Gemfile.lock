@@ -1,7 +1,7 @@
 PATH
   remote: .
   specs:
-    hub_kernel-mcp (0.8.1)
+    hub_kernel-mcp (0.9.0)
       hub_kernel-interface (~> 0.6)
       keystone_ui (>= 0.11.0)
       rails (>= 8.1.3)

@@ -2,6 +2,15 @@
 
 ## [Unreleased]
 
+## [0.9.0] - 2026-10-08
+
+### Changed
+- The approval page and the connected apps list are built from keystone_ui, so they take the host's keystone_ui theme.
+- The approval page names the app asking to connect in its page header, and Approve and Deny are each a button in a form of its own.
+- A refused approval request shows its reason in an error alert.
+- Each connected app is shown in its own panel titled with the app's name, with Disconnect as a danger button.
+- The gem depends on keystone_ui, and adds its views to the files the host's Tailwind build scans.
+
 ## [0.8.1] - 2026-10-08
 
 ### Fixed
