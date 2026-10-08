@@ -25,11 +25,15 @@ class ConnectionsSectionTest < ActionView::TestCase
   end
 
   test "each connection is shown in its own keystone panel" do
-    assert_equal [ "Claude" ], section_for(Person.new("sam")).css("li > div.ks-panel strong").map(&:text)
+    assert_equal [ "Disconnect" ], section_for(Person.new("sam")).css("li div.ks-panel button").map(&:text)
   end
 
   test "a connection's Disconnect button is keystone's danger button" do
     assert_equal [ "ks-button ks-button-danger ks-button-md" ], section_for(Person.new("sam")).css("li form button").map { |button| button["class"] }
+  end
+
+  test "a connection's app name is the title of a keystone section" do
+    assert_equal [ "Claude" ], section_for(Person.new("sam")).css("li h2.ks-section-title").map(&:text)
   end
 
   private

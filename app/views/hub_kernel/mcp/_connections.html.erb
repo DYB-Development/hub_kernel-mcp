@@ -1,13 +1,13 @@
 <ul>
   <% HubKernel::Mcp::Connection.of(person).includes(:client).order(:created_at).each do |connection| %>
     <li>
-      <%= ui_panel do %>
-        <strong><%= connection.client.name %></strong>
-        <span>Connected <%= l(connection.created_at, format: :long) %></span>
-        <span><%= connection.last_used_at ? "Last used #{l(connection.last_used_at, format: :long)}" : "Never used" %></span>
-        <%= ui_form(action: submit_url, method: :patch) do %>
-          <%= hidden_field_tag :connection_id, connection.id %>
-          <%= ui_button(label: "Disconnect", variant: :danger) %>
+      <%= ui_section(title: connection.client.name, subtitle: "Connected #{l(connection.created_at, format: :long)}") do %>
+        <%= ui_panel do %>
+          <span><%= connection.last_used_at ? "Last used #{l(connection.last_used_at, format: :long)}" : "Never used" %></span>
+          <%= ui_form(action: submit_url, method: :patch) do %>
+            <%= hidden_field_tag :connection_id, connection.id %>
+            <%= ui_button(label: "Disconnect", variant: :danger) %>
+          <% end %>
         <% end %>
       <% end %>
     </li>
