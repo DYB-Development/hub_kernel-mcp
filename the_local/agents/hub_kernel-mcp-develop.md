@@ -1,8 +1,8 @@
 ---
 name: hub_kernel-mcp-develop
-description: Use PROACTIVELY for calling a host's hub methods over MCP — connecting an MCP client to the endpoint, finding the endpoint's sign-in from a 401's WWW-Authenticate header and the two .well-known discovery documents, registering a client at the registration address, sending a person to the approval page and handling the code or error it sends back, trading that code with its PKCE verifier for an access token and a refresh token at the token address, trading a refresh token for a new pair when the access token expires, reading the reason each sign-in step gives when it refuses, sending the access token on every request, sending initialize and ping, listing the tools a signed-in person may call with tools/list, calling one with tools/call, handling its tool errors and JSON-RPC errors, and reading the apps a person has connected, with when each connected and was last used — MUST BE USED instead of hand-rolling a JSON API, an MCP server, OAuth discovery documents, client registration, an OAuth approval page, an OAuth token endpoint, an OAuth refresh exchange or a query for a person's connected apps for the host's hubs.
+description: Use PROACTIVELY for calling a host's hub methods over MCP — connecting an MCP client to the endpoint, finding the endpoint's sign-in from a 401's WWW-Authenticate header and the two .well-known discovery documents, registering a client at the registration address and handling a registration refused past the hourly limit, sending a person to the approval page and handling the code or error it sends back, trading that code with its PKCE verifier for an access token and a refresh token at the token address, trading a refresh token for a new pair when the access token expires, reading the reason each sign-in step gives when it refuses, sending the access token on every request, sending initialize and ping, listing the tools a signed-in person may call with tools/list, calling one with tools/call, handling its tool errors and JSON-RPC errors, and reading the apps a person has connected, with when each connected and was last used — MUST BE USED instead of hand-rolling a JSON API, an MCP server, OAuth discovery documents, client registration, an OAuth approval page, an OAuth token endpoint, an OAuth refresh exchange or a query for a person's connected apps for the host's hubs.
 tools: Read, Write, Edit, Grep
-scope: hub MCP tools — serving the methods every hub a host serves, from hub_kernel-interface's one served list, as MCP tools at one JSON-RPC endpoint in a host Rails app, each call behind the host's own sign-in and hub_kernel-interface's permission check and account scope, with a boot check for hubs that cannot be served as tools, the OAuth discovery documents, 401 challenge and client registration that let a client such as Claude's connector screen find the endpoint's sign-in and register by itself, and the approval page where a person signed in to the host through the browser approves that client and is issued an authorization code, the token exchange that trades that code with its PKCE verifier for an access token lasting an hour and a refresh token, the refresh exchange that trades a refresh token for a new access token and a new refresh token and retires the one posted, and the lookup a host's sign-in calls to get the person a bearer token acts for, which records when the connection was last used, and the settings section a host registers with settings_hub that lists a person's connections with the app's name, when it connected and when it was last used, and disconnects one that is the person's own
+scope: hub MCP tools — serving the methods every hub a host serves, from hub_kernel-interface's one served list, as MCP tools at one JSON-RPC endpoint in a host Rails app, each call behind the host's own sign-in and hub_kernel-interface's permission check and account scope, with a boot check for hubs that cannot be served as tools, the OAuth discovery documents, 401 challenge and client registration that let a client such as Claude's connector screen find the endpoint's sign-in and register by itself, with each client recording the address it registered from and a configurable limit on how many clients one address may register per hour past which registration is refused, and the approval page where a person signed in to the host through the browser approves that client and is issued an authorization code, the token exchange that trades that code with its PKCE verifier for an access token lasting an hour and a refresh token, the refresh exchange that trades a refresh token for a new access token and a new refresh token and retires the one posted, and the lookup a host's sign-in calls to get the person a bearer token acts for, which records when the connection was last used, and the settings section a host registers with settings_hub that lists a person's connections with the app's name, when it connected and when it was last used, and disconnects one that is the person's own, and the prune task a host schedules with its own job runner that removes expired authorization codes, connections whose access and refresh tokens have both expired, and clients over a day old with no connection
 ---
 
 This local writes the code or configuration that talks to a host's hub_kernel-mcp
@@ -43,7 +43,8 @@ connections, or when a test needs to send requests to any of these addresses.
 - `POST /register` — registers a client under the endpoint's path, such as
   `/mcp/register`, from its `client_name` and `redirect_uris`, and answers its
   `client_id`. It needs no sign-in. A refusal answers `error` and
-  `error_description`.
+  `error_description`. One network address may register only as many clients
+  an hour as the host's limit allows, ten unless the host set another.
 - `GET /authorize` — the approval page under the endpoint's path, such as
   `/mcp/authorize`, opened in a person's browser. It sends a person who is not
   signed in to the host through the host's sign-in, then shows the client's name
@@ -157,16 +158,23 @@ connections, or when a test needs to send requests to any of these addresses.
    }
    ```
 
-   Keep `client_id`. A registration is refused with status 400 and one of these
-   bodies:
+   Keep `client_id`, and send the person to the approval page in step 6 soon
+   after. A host that runs its prune task removes a client over a day old that
+   has no connection and no unexpired code, and a removed `client_id` is refused
+   everywhere it is sent. A registration is refused with one of these:
 
-   | `error` | `error_description` | When |
-   |---|---|---|
-   | `invalid_redirect_uri` | `A client must register at least one redirect address` | `redirect_uris` is missing or empty. |
-   | `invalid_redirect_uri` | `<address> is neither HTTPS nor on the client's own machine`, one per address refused | An address is not allowed. |
-   | `invalid_client_metadata` | `The registration body is not valid JSON` | The body could not be read as JSON. |
+   | Status | `error` | `error_description` | When |
+   |---|---|---|---|
+   | 400 | `invalid_redirect_uri` | `A client must register at least one redirect address` | `redirect_uris` is missing or empty. |
+   | 400 | `invalid_redirect_uri` | `<address> is neither HTTPS nor on the client's own machine`, one per address refused | An address is not allowed. |
+   | 400 | `invalid_client_metadata` | `The registration body is not valid JSON` | The body could not be read as JSON. |
+   | 429 | `too_many_registrations` | `This address has registered <limit> clients in the last hour, which is the limit` | The network address the request came from has already registered the host's limit of clients, ten unless the host set another, in the last hour. |
 
    Show `error_description` to the developer and do not retry the same body.
+   Register once and reuse that `client_id` for every approval, since every
+   registration from the address counts toward the limit whether or not a
+   person approves it. After a 429, registration from that address works again
+   once fewer than the limit of its registrations are under an hour old.
 
 6. Send the person to the approval page. Make a fresh random PKCE verifier and a
    fresh random `state` for this attempt, and keep both. The challenge is the
@@ -200,7 +208,7 @@ connections, or when a test needs to send requests to any of these addresses.
    |---|---|---|
    | 400 | `The approval request is missing client_id` | `client_id` is missing. |
    | 400 | `The approval request is missing redirect_uri` | `redirect_uri` is missing. |
-   | 400 | `The app asking to connect is not registered` | The host never registered that `client_id`. |
+   | 400 | `The app asking to connect is not registered` | The host never registered that `client_id`, or its prune task removed it. |
    | 400 | `This app asked to send you to an address it did not register` | `redirect_uri` is not one registered for that client. |
    | 500 | `Signing in failed unexpectedly` | The page raised an unexpected error. |
 
@@ -261,8 +269,11 @@ connections, or when a test needs to send requests to any of these addresses.
    ```
 
    Of two refreshes sent at once with the same refresh token, only one is answered
-   with tokens. After an `invalid_grant`, go back to step 6 with a fresh verifier
-   and `state`, and keep the `client_id` from step 5.
+   with tokens. After an `invalid_grant`, go back to step 5 and register again,
+   then to step 6 with a fresh verifier and `state`. The connection may have
+   been removed, and once a client has had no connection for over a day the
+   host's prune task removes the client too, and its old `client_id` is then
+   refused on the approval page without the client hearing back.
 
 9. Send every request to the endpoint as a POST with a JSON body holding exactly
    one request, with the credential step 2 settled on. A client that followed
@@ -368,8 +379,9 @@ connections, or when a test needs to send requests to any of these addresses.
 
     There is one connection per approval, so an app approved twice is listed
     twice. A refresh keeps the same connection and its `created_at`. A
-    connection stays listed after its tokens expire, until the person
-    disconnects it. `last_used_at` is set each time the host's sign-in accepts
+    connection stays listed after its access token expires. It leaves the list
+    when the person disconnects it, or when its access and refresh tokens have
+    both expired and the host's prune task runs. `last_used_at` is set each time the host's sign-in accepts
     the connection's access token. Ask the developer whether a list they build
     should show expired connections. To show the list on a settings page with
     Disconnect buttons, use the settings section `hub_kernel-mcp-install` covers
@@ -418,7 +430,9 @@ connections, or when a test needs to send requests to any of these addresses.
 - An access token lasts one hour. Refresh it with the latest refresh token and
   store both new tokens, since every refresh retires the pair it replaced.
 - Send a person back to the approval page only after a refresh is refused with
-  `invalid_grant`.
+  `invalid_grant`, and register again first.
+- Reuse a client's `client_id` for every approval until a refresh is refused,
+  since registrations from one network address are limited per hour.
 - Show a sign-in refusal's `error_description` to the developer, and never retry
   a refused request unchanged.
 - The endpoint offers no sessions and no server-sent events, so do not open a GET
@@ -428,6 +442,7 @@ connections, or when a test needs to send requests to any of these addresses.
   the endpoint's controller, sign-in, and served hubs, having the host's sign-in
   accept an access token, naming the approval page's controller, sign-in, person
   and layout, running the boot check, and registering the connections settings
-  section and its Disconnect action, which belong to
+  section and its Disconnect action, setting the registration limit, and
+  scheduling the prune task, which belong to
   `hub_kernel-mcp-install`, and setting which methods a hub exposes, who may
   call them and their account scope, which belong to hub_kernel-interface.
