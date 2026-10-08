@@ -28,4 +28,12 @@ class HubKernel::Mcp::ConnectionTest < ActiveSupport::TestCase
 
     assert_nil HubKernel::Mcp::Connection.person_for("unknown")
   end
+
+  test "a refresh token renews the connection with a new pair of tokens and stops working itself" do
+    tokens = HubKernel::Mcp::Connection.issue(person: Person.new("sam"), client: @client)
+
+    renewed = HubKernel::Mcp::Connection.refresh(tokens.refresh_token, client: @client)
+
+    assert_equal [ Person.new("sam"), nil ], [ HubKernel::Mcp::Connection.person_for(renewed.access_token), HubKernel::Mcp::Connection.refresh(tokens.refresh_token, client: @client) ]
+  end
 end
