@@ -1,6 +1,7 @@
 require "hub_kernel-interface"
 require "hub_kernel/mcp/version"
 require "hub_kernel/mcp/engine"
+require "hub_kernel/mcp/discovery"
 
 module HubKernel
   module Mcp
