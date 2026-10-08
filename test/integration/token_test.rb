@@ -65,6 +65,12 @@ class TokenTest < ActionDispatch::IntegrationTest
     assert_equal [ 200, Person.new("sam"), false ], [ response.status, HubKernel::Mcp::Connection.person_for(answer["access_token"]), answer["refresh_token"].in?([ nil, first["refresh_token"] ]) ]
   end
 
+  test "a refused refresh token is answered with the OAuth error and why" do
+    post "/mcp/token", params: { grant_type: "refresh_token", refresh_token: "unknown", client_id: @client.uid }
+
+    assert_equal [ 400, { "error" => "invalid_grant", "error_description" => "The refresh token is unknown, used, unused for ninety days, or belongs to another client" } ], [ response.status, response.parsed_body ]
+  end
+
   private
 
   def assert_refused
