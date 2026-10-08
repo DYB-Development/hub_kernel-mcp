@@ -91,6 +91,14 @@ class TokenTest < ActionDispatch::IntegrationTest
     assert_equal [ nil, nil ], [ HubKernel::Mcp::Connection.person_for(issued["access_token"]), HubKernel::Mcp::Connection.refresh(issued["refresh_token"], client: @client) ]
   end
 
+  test "an unexpected error at the token address is reported without its message reaching the client" do
+    reports = while_failing(HubKernel::Mcp::AuthorizationCode, :find_by) do
+      capture_error_reports { post "/mcp/token", params: @exchange }
+    end
+
+    assert_equal [ [ RuntimeError ], 500, { "error" => "server_error", "error_description" => "The sign-in failed unexpectedly" } ], [ reports.map { |report| report.error.class }, response.status, response.parsed_body ]
+  end
+
   private
 
   def assert_refused

@@ -4,6 +4,10 @@ module HubKernel
       UNUSABLE_CODE = "The code is unknown, used, expired, or does not match this client, redirect address or verifier".freeze
       UNUSABLE_REFRESH_TOKEN = "The refresh token is unknown, used, unused for ninety days, or belongs to another client".freeze
 
+      rescue_from(StandardError) do |error|
+        Rails.error.report(error, handled: true)
+        render status: :internal_server_error, json: { error: "server_error", error_description: "The sign-in failed unexpectedly" }
+      end
       rescue_from(ActionDispatch::Http::Parameters::ParseError) { refuse("invalid_request", "The token request body could not be read") }
 
       def create
