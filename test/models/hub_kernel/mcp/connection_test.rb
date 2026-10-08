@@ -22,4 +22,10 @@ class HubKernel::Mcp::ConnectionTest < ActiveSupport::TestCase
 
     assert_nil HubKernel::Mcp::Connection.person_for(token)
   end
+
+  test "an unknown access token gives no person" do
+    HubKernel::Mcp::Connection.issue(person: Person.new("sam"), client: @client)
+
+    assert_nil HubKernel::Mcp::Connection.person_for("unknown")
+  end
 end
