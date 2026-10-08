@@ -8,7 +8,7 @@ module HubKernel
       layout -> { HubKernel::Mcp.browser_layout }
 
       before_action { send(HubKernel::Mcp.sign_in_method) }
-      before_action :refuse_unregistered_redirect
+      before_action :refuse_unknown_client, :refuse_unregistered_redirect
       before_action :refuse_without_pkce
 
       helper_method :approval_params
@@ -25,9 +25,18 @@ module HubKernel
 
       private
 
-      def refuse_unregistered_redirect
+      def refuse_unknown_client
         @client = Client.find_by(uid: params[:client_id])
-        render :unregistered_redirect, status: :bad_request unless @client&.redirect_uris&.include?(params[:redirect_uri])
+        refuse_on_page("The app asking to connect is not registered") unless @client
+      end
+
+      def refuse_unregistered_redirect
+        refuse_on_page("This app asked to send you to an address it did not register") unless @client.redirect_uris.include?(params[:redirect_uri])
+      end
+
+      def refuse_on_page(reason)
+        @reason = reason
+        render :refused, status: :bad_request
       end
 
       def refuse_without_pkce

@@ -62,6 +62,14 @@ class ApprovalTest < ActionDispatch::IntegrationTest
     assert_redirected_to "https://claude.ai/callback?error=invalid_request&error_description=A+PKCE+challenge+using+S256+is+required&state=xyz"
   end
 
+  test "an approval request naming an unknown client shows an error page saying so and sends the person nowhere" do
+    sign_in "sam"
+
+    get "/mcp/authorize", params: @approval.merge(client_id: "unknown")
+
+    assert_equal [ 400, nil, "The app asking to connect is not registered" ], [ response.status, response.location, css_select("h1").text ]
+  end
+
   private
 
   def sign_in(person) = get("/sign_in", params: { person: person, return_to: "/" })
