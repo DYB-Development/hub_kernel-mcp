@@ -17,6 +17,8 @@ module HubKernel
 
       def create
         client = Client.find_by!(uid: params[:client_id])
+        return redirect_to_client(error: "access_denied") unless params[:decision] == "approve"
+
         code = AuthorizationCode.issue(person: send(HubKernel::Mcp.browser_person_method), client: client, redirect_uri: params[:redirect_uri], code_challenge: params[:code_challenge])
         redirect_to_client(code: code)
       end

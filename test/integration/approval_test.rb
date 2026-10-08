@@ -30,6 +30,14 @@ class ApprovalTest < ActionDispatch::IntegrationTest
     assert_equal [ "https://claude.ai/callback", "xyz", HubKernel::Mcp::AuthorizationCode.sole.code_digest ], [ response.location.split("?").first, answer["state"], HubKernel::Mcp::AuthorizationCode.digest(answer["code"]) ]
   end
 
+  test "a person who denies is sent back to the client's redirect address with an access-denied error and no code" do
+    sign_in "sam"
+
+    post "/mcp/authorize", params: @approval.merge(decision: "deny")
+
+    assert_equal [ "https://claude.ai/callback?error=access_denied&state=xyz", 0 ], [ response.location, HubKernel::Mcp::AuthorizationCode.count ]
+  end
+
   private
 
   def sign_in(person) = get("/sign_in", params: { person: person, return_to: "/" })
