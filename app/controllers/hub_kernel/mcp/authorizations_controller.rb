@@ -8,6 +8,7 @@ module HubKernel
       layout -> { HubKernel::Mcp.browser_layout }
 
       before_action { send(HubKernel::Mcp.sign_in_method) }
+      around_action :report_unexpected_errors
       before_action :refuse_missing_values, :refuse_unknown_client, :refuse_unregistered_redirect
       before_action :refuse_without_pkce
 
@@ -24,6 +25,14 @@ module HubKernel
       end
 
       private
+
+      def report_unexpected_errors
+        yield
+      rescue StandardError => error
+        Rails.error.report(error, handled: true)
+        @reason = "Signing in failed unexpectedly"
+        render :refused, status: :internal_server_error
+      end
 
       def refuse_missing_values
         missing = %i[client_id redirect_uri].find { |name| params[name].blank? }

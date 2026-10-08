@@ -81,6 +81,16 @@ class ApprovalTest < ActionDispatch::IntegrationTest
     assert_equal [ [ 400, nil, "The approval request is missing client_id" ], [ 400, nil, "The approval request is missing redirect_uri" ] ], pages
   end
 
+  test "an unexpected error on the approval page is reported without its message reaching the person" do
+    sign_in "sam"
+
+    reports = while_failing(HubKernel::Mcp::Client, :find_by) do
+      capture_error_reports { get "/mcp/authorize", params: @approval }
+    end
+
+    assert_equal [ [ RuntimeError ], 500, "Signing in failed unexpectedly" ], [ reports.map { |report| report.error.class }, response.status, css_select("h1").text ]
+  end
+
   private
 
   def sign_in(person) = get("/sign_in", params: { person: person, return_to: "/" })
