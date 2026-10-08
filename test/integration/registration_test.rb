@@ -18,4 +18,12 @@ class RegistrationTest < ActionDispatch::IntegrationTest
 
     assert_equal [ 400, { "error" => "invalid_client_metadata", "error_description" => "The registration body is not valid JSON" } ], [ response.status, response.parsed_body ]
   end
+
+  test "an unexpected error at the registration address is reported without its message reaching the client" do
+    reports = while_failing(HubKernel::Mcp::Client, :new) do
+      capture_error_reports { post "/mcp/register", params: { client_name: "Claude", redirect_uris: [ "https://claude.ai/callback" ] }, as: :json }
+    end
+
+    assert_equal [ [ RuntimeError ], 500, { "error" => "server_error", "error_description" => "The sign-in failed unexpectedly" } ], [ reports.map { |report| report.error.class }, response.status, response.parsed_body ]
+  end
 end
