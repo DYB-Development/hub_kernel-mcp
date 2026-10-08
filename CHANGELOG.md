@@ -2,6 +2,23 @@
 
 ## [Unreleased]
 
+## [0.8.0] - 2026-10-08
+
+### Added
+- A client such as Claude's connector screen can find the endpoint's sign-in by itself: every 401 names where the endpoint is described, and `HubKernel::Mcp::Discovery`, mounted at `/.well-known`, serves the endpoint's description and the sign-in's.
+- A client registers itself at `/register` with its name and redirect addresses, which must be HTTPS or on the client's own machine.
+- An approval page at `/authorize` runs inside the host's controller and layout, signs a person in through the host's sign-in, and sends them back to the client with a code or `access_denied`.
+- `HubKernel::Mcp.browser_controller`, `sign_in_method`, `browser_person_method` and `browser_layout` name what the approval page runs in, and `HubKernel::Mcp.check!` names each one a host has not set.
+- A client trades a code and its PKCE verifier at `/token` for an access token lasting an hour and a refresh token, and trades a refresh token for a new pair.
+- `HubKernel::Mcp::Connection.person_for` gives a host's sign-in the person an access token acts for.
+- The `hub_kernel/mcp/connections` partial and the `HubKernel::Mcp::Disconnect` action give a host's settings page a list of a person's connected apps and a way to disconnect one.
+- `HubKernel::Mcp.registration_limit` limits how many clients one address may register an hour.
+- `bin/rails hub_kernel_mcp:prune` removes expired codes, connections that can no longer be used, and clients over a day old with no connection.
+- The gem ships migrations, installed with `bin/rails hub_kernel_mcp:install:migrations`.
+
+### Changed
+- A host must set the four approval page settings, or `HubKernel::Mcp.check!` raises at boot.
+
 ## [0.7.0] - 2026-10-07
 
 ### Added
