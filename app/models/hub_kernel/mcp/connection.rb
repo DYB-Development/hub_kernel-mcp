@@ -14,6 +14,8 @@ module HubKernel
         token
       end
 
+      def self.person_for(token) = find_by(token_digest: digest(token.to_s))&.person
+
       def self.digest(token) = Digest::SHA256.hexdigest(token)
 
       def person = GlobalID::Locator.locate(person_gid)
