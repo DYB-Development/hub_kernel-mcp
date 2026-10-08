@@ -12,4 +12,10 @@ class SignInTest < ActionDispatch::IntegrationTest
 
     assert_equal [ 401, [] ], [ response.status, asked ]
   end
+
+  test "a caller the host's sign-in refuses is told where the endpoint's sign-in is described" do
+    post "/mcp", params: { jsonrpc: "2.0", id: 1, method: "tools/list" }, as: :json
+
+    assert_equal 'Bearer resource_metadata="http://www.example.com/.well-known/oauth-protected-resource/mcp"', response.headers["WWW-Authenticate"]
+  end
 end
