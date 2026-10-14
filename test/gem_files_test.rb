@@ -18,4 +18,11 @@ class GemFilesTest < ActiveSupport::TestCase
 
     assert_includes dependencies.map(&:name), "keystone_ui"
   end
+
+  test "the packaged gem refuses a hub_kernel-interface older than the release holding the caller setting" do
+    dependencies = Gem::Specification.load(File.expand_path("../hub_kernel-mcp.gemspec", __dir__)).runtime_dependencies
+    requirement = dependencies.find { |dependency| dependency.name == "hub_kernel-interface" }.requirement
+
+    assert_not requirement.satisfied_by?(Gem::Version.new("0.8.0"))
+  end
 end

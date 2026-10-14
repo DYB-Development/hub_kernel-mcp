@@ -76,9 +76,9 @@ module HubKernel
 
       def description(served_name, exposure) = exposure.writes ? "Changes data in the #{served_name} hub." : "Reads data from the #{served_name} hub."
 
-      def caller_person = send(HubKernel::Mcp.person_method)
+      def caller_person = send(HubKernel::Mcp.person_method || HubKernel::Interface.person_method)
 
-      def caller_account = send(HubKernel::Mcp.account_method)
+      def caller_account = send(HubKernel::Mcp.account_method || HubKernel::Interface.account_method)
     end
   end
 end

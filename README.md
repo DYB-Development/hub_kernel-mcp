@@ -15,6 +15,11 @@ HubKernel::Mcp.person_method = :current_person
 HubKernel::Mcp.account_method = :current_account
 ```
 
+When `HubKernel::Mcp.person_method` or `HubKernel::Mcp.account_method` is not set, MCP uses
+`HubKernel::Interface.person_method` or `HubKernel::Interface.account_method`, so a host that
+also serves hub_kernel-api can name the caller once in hub_kernel-interface. MCP's own setting
+is used when it is set.
+
 The hubs served are the host's one list in hub_kernel-interface, which every interface gem
 serves:
 
