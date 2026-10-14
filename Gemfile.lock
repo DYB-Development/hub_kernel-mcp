@@ -106,11 +106,11 @@ GEM
       prism (>= 1.3.0)
       rdoc (>= 4.0.0)
       reline (>= 0.4.2)
-    json (3.0.2)
-    keystone_ui (0.37.0)
-      keystone_ui-styles (>= 0.12.0)
+    json (3.1.0)
+    keystone_ui (0.40.0)
+      keystone_ui-styles (>= 0.15.0)
       view_component (>= 2.0, < 5)
-    keystone_ui-styles (0.13.0)
+    keystone_ui-styles (0.17.0)
       railties (>= 7.0)
     language_server-protocol (3.17.0.6)
     lint_roller (1.1.0)
@@ -161,7 +161,7 @@ GEM
       racc
     pp (0.6.4)
       prettyprint
-    prettyprint (0.2.0)
+    prettyprint (0.2.1)
     prism (1.9.0)
     propshaft (1.3.2)
       actionpack (>= 7.0.0)
@@ -210,7 +210,7 @@ GEM
       zeitwerk (~> 2.6)
     rainbow (3.1.1)
     rake (13.4.2)
-    rbs (4.2.0)
+    rbs (4.1.3)
       logger
       prism (>= 1.6.0)
       tsort
@@ -269,7 +269,7 @@ GEM
     unicode-display_width (3.3.0)
       unicode-emoji (~> 4.3)
     unicode-emoji (4.3.0)
-    uri (1.1.1)
+    uri (1.1.2)
     useragent (0.16.11)
     view_component (4.15.0)
       actionview (>= 7.1.0)
