@@ -23,4 +23,15 @@ class SharedCallerTest < ActionDispatch::IntegrationTest
 
     assert_equal [ [ "sam", "acme" ] ], asked
   end
+
+  test "MCP's own person and account methods are used instead of the shared ones when set" do
+    HubKernel::Mcp.person_method, HubKernel::Mcp.account_method = :current_person, :current_account
+    HubKernel::Interface.person_method, HubKernel::Interface.account_method = :current_account, :current_person
+    asked = []
+    HubKernel::Authz.check = ->(person, _action, account) { asked << [ person, account ] && true }
+
+    post "/mcp", params: { jsonrpc: "2.0", id: 1, method: "tools/call", params: { name: "shop__price_of", arguments: { item: "soap" } } }, headers: { "X-Person" => "sam", "X-Account" => "acme" }, as: :json
+
+    assert_equal [ [ "sam", "acme" ] ], asked
+  end
 end
