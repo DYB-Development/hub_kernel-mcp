@@ -16,7 +16,7 @@ gem "rubocop-rails-omakase", require: false
 # gem "debug", ">= 1.0.0"
 
 # Authors and checks the gem's expert agents [https://github.com/tylercschneider/the_local]
-gem "the_local", "~> 0.4.1"
+gem "the_local", "~> 0.4.3"
 
 # Gives this repo keystone_ui's expert agents, which the_local installs only for gems listed here [https://github.com/DYB-Development/keystone_ui]
 gem "keystone_ui", ">= 0.11.0"
