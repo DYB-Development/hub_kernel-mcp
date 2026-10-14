@@ -20,6 +20,6 @@ Gem::Specification.new do |spec|
   end
 
   spec.add_dependency "rails", ">= 8.1.3"
-  spec.add_dependency "hub_kernel-interface", "~> 0.6"
+  spec.add_dependency "hub_kernel-interface", "~> 0.9"
   spec.add_dependency "keystone_ui", ">= 0.11.0"
 end
