@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [0.10.0] - 2026-10-14
+
 ### Changed
 - An MCP call is made for the person and account that `HubKernel::Interface.person_method` and `HubKernel::Interface.account_method` give when `HubKernel::Mcp.person_method` or `HubKernel::Mcp.account_method` is not set, and MCP's own setting is used when it is.
 - hub_kernel-mcp requires hub_kernel-interface 0.9.
