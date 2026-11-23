@@ -30,6 +30,14 @@ class HubKernel::Mcp::ConnectionTest < ActiveSupport::TestCase
     assert_equal [ Person.new("sam"), Account.new("acme") ], [ caller.person, caller.account ]
   end
 
+  test "an access token from a connection made with no account gives its person and no account" do
+    token = HubKernel::Mcp::Connection.issue(person: Person.new("sam"), client: @client).access_token
+
+    caller = HubKernel::Mcp::Connection.caller_for(token)
+
+    assert_equal [ Person.new("sam"), nil ], [ caller.person, caller.account ]
+  end
+
   test "an expired access token gives no person" do
     token = HubKernel::Mcp::Connection.issue(person: Person.new("sam"), client: @client).access_token
     travel 1.hour + 1.second
