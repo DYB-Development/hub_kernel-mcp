@@ -73,7 +73,11 @@ module HubKernel
 
       def approving_person = send(HubKernel::Mcp.browser_person_method)
 
-      def approval_accounts = HubKernel::Mcp.approval_accounts&.call(approving_person)
+      def approval_accounts
+        return @approval_accounts if defined?(@approval_accounts)
+
+        @approval_accounts = HubKernel::Mcp.approval_accounts&.call(approving_person)
+      end
 
       def account_options = approval_accounts&.map { |label, account| [ label, account.to_global_id.to_s ] }
 
