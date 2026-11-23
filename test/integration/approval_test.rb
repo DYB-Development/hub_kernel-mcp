@@ -151,6 +151,18 @@ class ApprovalTest < ActionDispatch::IntegrationTest
     assert_equal Account.new("globex"), HubKernel::Mcp::AuthorizationCode.sole.account
   end
 
+  test "an approval with no account picked, or with an account that is not the person's, is shown again asking for one and issues no code" do
+    HubKernel::Mcp.approval_accounts = ->(_person) { [ [ "Acme", Account.new("acme") ], [ "Globex", Account.new("globex") ] ] }
+    sign_in "sam"
+
+    pages = [ nil, Account.new("initech").to_global_id.to_s ].map do |account|
+      post "/mcp/authorize", params: @approval.merge(decision: "approve", account: account)
+      [ response.status, css_select(".ks-error").text ]
+    end
+
+    assert_equal [ [ [ 422, "Choose the account this app connects to" ] ] * 2, 0 ], [ pages, HubKernel::Mcp::AuthorizationCode.count ]
+  end
+
   private
 
   def refusal_reason = css_select(".ks-alert-message").text

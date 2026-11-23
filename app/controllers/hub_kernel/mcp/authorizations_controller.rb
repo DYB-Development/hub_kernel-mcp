@@ -19,12 +19,18 @@ module HubKernel
 
       def create
         return redirect_to_client(error: "access_denied") unless params[:decision] == "approve"
+        return ask_for_account if approval_accounts && !picked_account
 
         code = AuthorizationCode.issue(person: approving_person, account: picked_account, client: @client, redirect_uri: params[:redirect_uri], code_challenge: params[:code_challenge])
         redirect_to_client(code: code)
       end
 
       private
+
+      def ask_for_account
+        @account_error = "Choose the account this app connects to"
+        render :new, status: :unprocessable_content
+      end
 
       def report_unexpected_errors
         yield
