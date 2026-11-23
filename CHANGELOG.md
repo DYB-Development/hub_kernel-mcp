@@ -2,6 +2,19 @@
 
 ## [Unreleased]
 
+## [0.11.0] - 2026-11-23
+
+### Added
+- `HubKernel::Mcp.approval_accounts` names the accounts a person may connect an app to, and the approval page then asks which one the app connects to.
+- A person with one account finds it already picked on the approval page.
+- Approving with no account picked, or with an account not in the person's list, shows the approval page again and issues no code.
+- Each authorization code and each connection keeps the account picked when the app was approved.
+- `HubKernel::Mcp::Connection.caller_for` gives a host's sign-in the person and the account an access token acts for.
+- Two migrations add a nullable account column to authorization codes and connections, installed with `bin/rails hub_kernel_mcp:install:migrations`.
+
+### Changed
+- A connection made with no account, including every connection made before 0.11.0, gives no account, and the host decides which account its calls run in.
+
 ## [0.10.0] - 2026-10-14
 
 ### Changed

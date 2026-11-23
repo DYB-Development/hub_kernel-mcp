@@ -14,6 +14,14 @@ class TokenTest < ActionDispatch::IntegrationTest
     assert_equal [ 200, "Bearer", 3600, HubKernel::Mcp::Connection.sole.token_digest ], [ response.status, answer["token_type"], answer["expires_in"], HubKernel::Mcp::Connection.digest(answer["access_token"].to_s) ]
   end
 
+  test "a code approved for an account gives a connection in that account" do
+    code = HubKernel::Mcp::AuthorizationCode.issue(person: Person.new("sam"), client: @client, redirect_uri: "https://claude.ai/callback", code_challenge: "E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM", account: Account.new("acme"))
+
+    post "/mcp/token", params: @exchange.merge(code: code)
+
+    assert_equal Account.new("acme"), HubKernel::Mcp::Connection.sole.account
+  end
+
   test "a code posted with a verifier that does not match its challenge is refused and gives no token" do
     post "/mcp/token", params: @exchange.merge(code_verifier: "another-verifier")
 

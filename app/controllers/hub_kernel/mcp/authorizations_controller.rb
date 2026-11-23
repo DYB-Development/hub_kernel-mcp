@@ -12,19 +12,25 @@ module HubKernel
       before_action :refuse_missing_values, :refuse_unknown_client, :refuse_unregistered_redirect
       before_action :refuse_without_pkce
 
-      helper_method :approval_params
+      helper_method :approval_params, :account_options, :preselected_account
 
       def new
       end
 
       def create
         return redirect_to_client(error: "access_denied") unless params[:decision] == "approve"
+        return ask_for_account if approval_accounts && !picked_account
 
-        code = AuthorizationCode.issue(person: send(HubKernel::Mcp.browser_person_method), client: @client, redirect_uri: params[:redirect_uri], code_challenge: params[:code_challenge])
+        code = AuthorizationCode.issue(person: approving_person, account: picked_account, client: @client, redirect_uri: params[:redirect_uri], code_challenge: params[:code_challenge])
         redirect_to_client(code: code)
       end
 
       private
+
+      def ask_for_account
+        @account_error = "Choose the account this app connects to"
+        render :new, status: :unprocessable_content
+      end
 
       def report_unexpected_errors
         yield
@@ -64,6 +70,20 @@ module HubKernel
       end
 
       def approval_params = params.permit(*APPROVAL_PARAMS)
+
+      def approving_person = send(HubKernel::Mcp.browser_person_method)
+
+      def approval_accounts
+        return @approval_accounts if defined?(@approval_accounts)
+
+        @approval_accounts = HubKernel::Mcp.approval_accounts&.call(approving_person)
+      end
+
+      def account_options = approval_accounts&.map { |label, account| [ label, account.to_global_id.to_s ] }
+
+      def preselected_account = (account_options.sole.last if account_options.one?)
+
+      def picked_account = approval_accounts&.map(&:last)&.find { |account| account.to_global_id.to_s == params[:account] }
     end
   end
 end

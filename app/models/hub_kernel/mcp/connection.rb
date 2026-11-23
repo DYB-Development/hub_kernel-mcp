@@ -8,14 +8,15 @@ module HubKernel
       REFRESH_LIFETIME = 90.days
 
       Tokens = Data.define(:access_token, :refresh_token)
+      Caller = Data.define(:person, :account)
 
       belongs_to :client
 
       scope :of, ->(person) { where(person_gid: person.to_global_id.to_s) }
 
-      def self.issue(person:, client:, code_digest: nil)
+      def self.issue(person:, client:, code_digest: nil, account: nil)
         tokens = new_tokens
-        create!(person_gid: person.to_global_id.to_s, client: client, code_digest: code_digest, **digests_for(tokens))
+        create!(person_gid: person.to_global_id.to_s, account_gid: account&.to_global_id&.to_s, client: client, code_digest: code_digest, **digests_for(tokens))
         tokens
       end
 
@@ -28,11 +29,13 @@ module HubKernel
         tokens if renewed == 1
       end
 
-      def self.person_for(token)
+      def self.caller_for(token)
         connection = where(expires_at: Time.current..).find_by(token_digest: digest(token.to_s))
         connection&.touch(:last_used_at)
-        connection&.person
+        connection && Caller.new(person: connection.person, account: connection.account)
       end
+
+      def self.person_for(token) = caller_for(token)&.person
 
       def self.digest(token) = Digest::SHA256.hexdigest(token)
 
@@ -45,6 +48,8 @@ module HubKernel
       private_class_method :new_tokens, :digests_for
 
       def person = GlobalID::Locator.locate(person_gid)
+
+      def account = GlobalID::Locator.locate(account_gid)
     end
   end
 end

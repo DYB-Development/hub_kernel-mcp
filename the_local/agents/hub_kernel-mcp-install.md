@@ -1,8 +1,8 @@
 ---
 name: hub_kernel-mcp-install
-description: Use to hook hub_kernel-mcp into a project — adding the gem, naming the controller the endpoint inherits from and the person and account methods on it, naming the browser controller, sign-in method, person method and layout the approval page runs with, running the boot check after the served list is set, mounting the engine, and, for sign-in from a connector screen, installing the migrations, mounting the discovery documents, setting how many clients one address may register per hour, having the host's sign-in look up the person an access token acts for, registering the settings section that lists a person's connections and disconnects one, and scheduling the task that prunes sign-in records.
+description: Use to hook hub_kernel-mcp into a project — adding the gem, naming the controller the endpoint inherits from and the person and account methods on it, naming the browser controller, sign-in method, person method and layout the approval page runs with, running the boot check after the served list is set, mounting the engine, and, for sign-in from a connector screen, installing the migrations, mounting the discovery documents, setting how many clients one address may register per hour, naming the accounts a person may pick on the approval page, having the host's sign-in look up the person an access token acts for and the account it was approved for, registering the settings section that lists a person's connections and disconnects one, and scheduling the task that prunes sign-in records.
 tools: Bash, Read, Edit
-scope: hub MCP tools — serving the methods every hub a host serves, from hub_kernel-interface's one served list, as MCP tools at one JSON-RPC endpoint in a host Rails app, each call behind the host's own sign-in and hub_kernel-interface's permission check and account scope, with a boot check for hubs that cannot be served as tools, the OAuth discovery documents, 401 challenge and client registration that let a client such as Claude's connector screen find the endpoint's sign-in and register by itself, with each client recording the address it registered from and a configurable limit on how many clients one address may register per hour past which registration is refused, and the approval page where a person signed in to the host through the browser approves that client and is issued an authorization code, the token exchange that trades that code with its PKCE verifier for an access token lasting an hour and a refresh token, the refresh exchange that trades a refresh token for a new access token and a new refresh token and retires the one posted, and the lookup a host's sign-in calls to get the person a bearer token acts for, which records when the connection was last used, and the settings section a host registers with settings_hub that lists a person's connections with the app's name, when it connected and when it was last used, and disconnects one that is the person's own, and the prune task a host schedules with its own job runner that removes expired authorization codes, connections whose access and refresh tokens have both expired, and clients over a day old with no connection
+scope: hub MCP tools — serving the methods every hub a host serves, from hub_kernel-interface's one served list, as MCP tools at one JSON-RPC endpoint in a host Rails app, each call behind the host's own sign-in and hub_kernel-interface's permission check and account scope, with a boot check for hubs that cannot be served as tools, the OAuth discovery documents, 401 challenge and client registration that let a client such as Claude's connector screen find the endpoint's sign-in and register by itself, with each client recording the address it registered from and a configurable limit on how many clients one address may register per hour past which registration is refused, and the approval page where a person signed in to the host through the browser approves that client, picks the account it connects to when the host names the person's accounts, and is issued an authorization code, the token exchange that trades that code with its PKCE verifier for an access token lasting an hour and a refresh token, the refresh exchange that trades a refresh token for a new access token and a new refresh token and retires the one posted, and the lookups a host's sign-in calls to get the person a bearer token acts for, or that person and the account picked on the approval page, each recording when the connection was last used, and the settings section a host registers with settings_hub that lists a person's connections with the app's name, when it connected and when it was last used, and disconnects one that is the person's own, and the prune task a host schedules with its own job runner that removes expired authorization codes, connections whose access and refresh tokens have both expired, and clients over a day old with no connection
 ---
 
 This local follows these steps exactly and invents none. Where a step names a
@@ -31,15 +31,17 @@ a signed-in person's behalf.
 - `mount HubKernel::Mcp::Discovery` — mounts the two OAuth discovery documents
   in the host's `config/routes.rb`. It must be mounted at `"/.well-known"`,
   since the endpoint's 401 header names that path.
-- `bin/rails hub_kernel_mcp:install:migrations` — copies the gem's seven
+- `bin/rails hub_kernel_mcp:install:migrations` — copies the gem's nine
   migrations into the host's `db/migrate`. They create the
   `hub_kernel_mcp_clients` table, which holds each client that registers, the
   `hub_kernel_mcp_authorization_codes` table, which holds each code the
   approval page issues, and the `hub_kernel_mcp_connections` table, which holds
   each access token issued for a code. They then add the refresh token's
   columns, a `last_used_at` column and an indexed `code_digest` column to
-  `hub_kernel_mcp_connections`, and a `registered_from` column, indexed with
-  `created_at`, to `hub_kernel_mcp_clients`.
+  `hub_kernel_mcp_connections`, a `registered_from` column, indexed with
+  `created_at`, to `hub_kernel_mcp_clients`, and a nullable `account_gid`
+  column, which holds the global id of the account picked on the approval page,
+  to both `hub_kernel_mcp_authorization_codes` and `hub_kernel_mcp_connections`.
 - `HubKernel::Mcp.base_controller=` — the name, as a String, of the host
   controller the endpoint inherits from. Its before-actions, including sign-in,
   run before any hub is asked. Defaults to `"ActionController::API"`, which has
@@ -64,6 +66,17 @@ a signed-in person's behalf.
 - `HubKernel::Mcp.registration_limit=` — the number, as an Integer, of clients
   one IP address may register in the last hour. A registration past it is
   answered with status 429 and `too_many_registrations`. Defaults to `10`.
+- `HubKernel::Mcp.approval_accounts=` — a callable the approval page calls with
+  the signed-in person, which returns the accounts that person may connect an
+  app to, as `[[label, account], ...]`. Each account must be a record with a
+  global id. When it is set, the approval page shows the accounts in a select
+  labelled `Account` and asks which one the app connects to, a person with one
+  account finds it already picked, and approving with no account picked, or one
+  not in the list, shows the page again with
+  `Choose the account this app connects to` and issues no code. The picked
+  account is kept on the authorization code and then on the connection. When it
+  is not set, the page asks for no account and every connection is made with
+  none. No default.
 - `HubKernel::Mcp.check!` — the boot check. Raises
   `HubKernel::Mcp::UnservableHubError` when any served hub cannot be served as
   tools, or when any of the four browser settings is not set, and returns
@@ -77,6 +90,14 @@ a signed-in person's behalf.
   old, replaced by a refresh, or disconnected. Each time it returns a person it
   records the time as the connection's last use. The host's sign-in on the base
   controller calls it.
+- `HubKernel::Mcp::Connection.caller_for` — takes the same bearer token, as a
+  String, and returns a value whose `person` is the person who approved the
+  client and whose `account` is the account they picked on the approval page.
+  `account` is `nil` for a connection made with no account, which includes every
+  connection made before the `account_gid` migration ran. Returns `nil` for the
+  same tokens `person_for` does, and records the connection's last use the same
+  way. A host that lets a person pick an account calls it in place of
+  `person_for`.
 - `SettingsHub.section` — settings_hub's call that registers a section on the
   host's settings page. The host calls it once to register the connections
   section, naming the partial and the action below.
@@ -195,9 +216,9 @@ a signed-in person's behalf.
    bin/rails hub_kernel_mcp:install:migrations db:migrate
    ```
 
-   This adds seven migrations to the host's `db/migrate` and the
+   This adds nine migrations to the host's `db/migrate` and the
    `hub_kernel_mcp_clients`, `hub_kernel_mcp_authorization_codes` and
-   `hub_kernel_mcp_connections` tables to `db/schema.rb`. Commit all eight
+   `hub_kernel_mcp_connections` tables to `db/schema.rb`. Commit all ten
    files.
 
 10. Add the discovery mount to `config/routes.rb`, at the site root beside the
@@ -258,6 +279,33 @@ a signed-in person's behalf.
     account. If it reads the account from something a token request does not
     carry, such as a session or a subdomain, tell the developer and ask what it
     should return.
+
+    Ask the developer whether a person may belong to more than one account and
+    should pick, on the approval page, the account an app connects to. If not,
+    leave `approval_accounts` unset and keep `person_for`. If so, ask how to list
+    a person's accounts and what label each shows, and do not choose either. Add
+    the answer to `config/initializers/hub_kernel_mcp.rb`:
+
+    ```ruby
+    HubKernel::Mcp.approval_accounts = ->(person) { person.accounts.map { |account| [ account.name, account ] } }
+    ```
+
+    Then have the base controller look the token up with
+    `HubKernel::Mcp::Connection.caller_for`, and take both the person and the
+    account from it:
+
+    ```ruby
+    def current_caller = authenticate_with_http_token { |token| HubKernel::Mcp::Connection.caller_for(token) }
+
+    def current_person = current_caller&.person
+
+    def current_account = current_caller&.account || default_account
+    ```
+
+    A connection approved with no account, including every connection made
+    before the `account_gid` migration ran, gives `nil` as its account. Ask the
+    developer which account such a call runs in, or whether it is refused, and
+    do not choose. `default_account` above stands for that answer.
 
 14. Check the layout from step 4. The approval page runs inside the gem's
     engine, so a route helper the layout calls for one of the host's own routes,
@@ -346,16 +394,27 @@ a signed-in person's behalf.
   while signed out: the host's sign-in should take over. Signed in, the same
   address with no query shows a page saying
   `The approval request is missing client_id`.
+- With `approval_accounts` set, check it with
+  `bin/rails runner "p HubKernel::Mcp.approval_accounts.call(User.first)"`,
+  using the host's own person model, which should print each label beside its
+  account record.
 - With the token lookup installed, check it with
-  `bin/rails runner "p HubKernel::Mcp::Connection.person_for('unknown')"`,
-  which should print `nil`, and with `curl -i -X POST <host>/mcp` carrying
-  `Authorization: Bearer unknown`, which should answer 401.
-- Run `bin/rails hub_kernel_mcp:install:migrations` again after upgrading the
-  gem, then `db:migrate`. It copies only migrations the host does not have yet.
-  A host that installed an earlier version with fewer than seven migrations gets
-  the missing ones this way. Until they are run, the registration address or
-  the token address answers status 500 with `server_error`, or the token lookup
-  and the connections list fail on the missing `last_used_at` column.
+  `bin/rails runner "p HubKernel::Mcp::Connection.person_for('unknown')"`, or
+  `caller_for` in its place, which should print `nil`, and with
+  `curl -i -X POST <host>/mcp` carrying `Authorization: Bearer unknown`, which
+  should answer 401.
+- Run `bin/rails hub_kernel_mcp:install:migrations db:migrate` again after
+  upgrading the gem. It copies only migrations the host does not have yet. A
+  host that installed an earlier version with fewer than nine migrations gets
+  the missing ones this way, including the two that add `account_gid`. Until
+  they are run, the registration address or the token address answers status
+  500 with `server_error`, the approval page says
+  `Signing in failed unexpectedly`, or the token lookups and the connections
+  list fail on a missing column.
+- Each approval makes its own connection, so a person who connects the same app
+  to a second account has two connections, each listed in the connections
+  section. A refreshed access token stays in the account its connection was
+  approved for.
 - With the prune task scheduled, run `bin/rails hub_kernel_mcp:prune` once by
   hand. It prints nothing and exits 0. It removes only codes past their ten
   minutes, connections with no working token, and clients over a day old with

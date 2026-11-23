@@ -10,10 +10,32 @@ class HubKernel::Mcp::ConnectionTest < ActiveSupport::TestCase
     assert_equal [ Digest::SHA256.hexdigest(token), Person.new("sam"), @client ], [ stored.token_digest, stored.person, stored.client ]
   end
 
+  test "an issued connection holds the account it was approved for" do
+    HubKernel::Mcp::Connection.issue(person: Person.new("sam"), client: @client, account: Account.new("acme"))
+
+    assert_equal Account.new("acme"), HubKernel::Mcp::Connection.sole.account
+  end
+
   test "an unexpired access token gives the person it acts for" do
     token = HubKernel::Mcp::Connection.issue(person: Person.new("sam"), client: @client).access_token
 
     assert_equal Person.new("sam"), HubKernel::Mcp::Connection.person_for(token)
+  end
+
+  test "an unexpired access token gives the person it acts for and the account it acts in" do
+    token = HubKernel::Mcp::Connection.issue(person: Person.new("sam"), client: @client, account: Account.new("acme")).access_token
+
+    caller = HubKernel::Mcp::Connection.caller_for(token)
+
+    assert_equal [ Person.new("sam"), Account.new("acme") ], [ caller.person, caller.account ]
+  end
+
+  test "an access token from a connection made with no account gives its person and no account" do
+    token = HubKernel::Mcp::Connection.issue(person: Person.new("sam"), client: @client).access_token
+
+    caller = HubKernel::Mcp::Connection.caller_for(token)
+
+    assert_equal [ Person.new("sam"), nil ], [ caller.person, caller.account ]
   end
 
   test "an expired access token gives no person" do
@@ -35,6 +57,14 @@ class HubKernel::Mcp::ConnectionTest < ActiveSupport::TestCase
     renewed = HubKernel::Mcp::Connection.refresh(tokens.refresh_token, client: @client)
 
     assert_equal [ Person.new("sam"), nil ], [ HubKernel::Mcp::Connection.person_for(renewed.access_token), HubKernel::Mcp::Connection.refresh(tokens.refresh_token, client: @client) ]
+  end
+
+  test "a renewed access token acts in the account the connection was approved for" do
+    tokens = HubKernel::Mcp::Connection.issue(person: Person.new("sam"), client: @client, account: Account.new("acme"))
+
+    renewed = HubKernel::Mcp::Connection.refresh(tokens.refresh_token, client: @client)
+
+    assert_equal Account.new("acme"), HubKernel::Mcp::Connection.caller_for(renewed.access_token).account
   end
 
   test "a refresh token posted by another client gives nothing" do

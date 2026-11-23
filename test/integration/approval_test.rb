@@ -6,6 +6,8 @@ class ApprovalTest < ActionDispatch::IntegrationTest
     @approval = { response_type: "code", client_id: @client.uid, redirect_uri: "https://claude.ai/callback", state: "xyz", code_challenge: "E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM", code_challenge_method: "S256" }
   end
 
+  teardown { HubKernel::Mcp.approval_accounts = nil }
+
   test "a person who is not signed in is sent to the host's sign-in and returned to the approval page" do
     get "/mcp/authorize", params: @approval
     get response.location, params: { person: "sam" }
@@ -131,9 +133,74 @@ class ApprovalTest < ActionDispatch::IntegrationTest
     assert_equal "The app asking to connect is not registered", css_select(".ks-alert-error .ks-alert-message").text
   end
 
+  test "a person with several accounts is asked which of them the app connects to" do
+    HubKernel::Mcp.approval_accounts = ->(person) { [ [ "Acme for #{person.id}", Account.new("acme") ], [ "Globex for #{person.id}", Account.new("globex") ] ] }
+    sign_in "sam"
+
+    get "/mcp/authorize", params: @approval
+
+    assert_equal [ [ "Choose an account", "" ], [ "Acme for sam", Account.new("acme").to_global_id.to_s ], [ "Globex for sam", Account.new("globex").to_global_id.to_s ] ], account_options
+  end
+
+  test "a person who approves with an account picked is issued a code for that account" do
+    HubKernel::Mcp.approval_accounts = ->(_person) { [ [ "Acme", Account.new("acme") ], [ "Globex", Account.new("globex") ] ] }
+    sign_in "sam"
+
+    post "/mcp/authorize", params: @approval.merge(decision: "approve", account: Account.new("globex").to_global_id.to_s)
+
+    assert_equal Account.new("globex"), HubKernel::Mcp::AuthorizationCode.sole.account
+  end
+
+  test "an approval with no account picked, or with an account that is not the person's, is shown again asking for one and issues no code" do
+    HubKernel::Mcp.approval_accounts = ->(_person) { [ [ "Acme", Account.new("acme") ], [ "Globex", Account.new("globex") ] ] }
+    sign_in "sam"
+
+    pages = [ nil, Account.new("initech").to_global_id.to_s ].map do |account|
+      post "/mcp/authorize", params: @approval.merge(decision: "approve", account: account)
+      [ response.status, css_select(".ks-error").text ]
+    end
+
+    assert_equal [ [ [ 422, "Choose the account this app connects to" ] ] * 2, 0 ], [ pages, HubKernel::Mcp::AuthorizationCode.count ]
+  end
+
+  test "a person with one account finds it already picked" do
+    HubKernel::Mcp.approval_accounts = ->(_person) { [ [ "Acme", Account.new("acme") ] ] }
+    sign_in "sam"
+
+    get "/mcp/authorize", params: @approval
+
+    assert_equal [ "Acme" ], css_select("select[name=account] option[selected]").map(&:text)
+  end
+
+  test "a host that sets no approval accounts is asked for no account and is issued a code with none" do
+    sign_in "sam"
+
+    get "/mcp/authorize", params: @approval
+    fields = css_select("select[name=account]").size
+    post "/mcp/authorize", params: @approval.merge(decision: "approve")
+
+    assert_equal [ 0, nil ], [ fields, HubKernel::Mcp::AuthorizationCode.sole.account ]
+  end
+
+  test "connecting the same app to a second account makes a second connection beside the first" do
+    HubKernel::Mcp.approval_accounts = ->(_person) { [ [ "Acme", Account.new("acme") ], [ "Globex", Account.new("globex") ] ] }
+    sign_in "sam"
+
+    tokens = %w[acme globex].map do |id|
+      post "/mcp/authorize", params: @approval.merge(decision: "approve", account: Account.new(id).to_global_id.to_s)
+      code = Rack::Utils.parse_query(URI(response.location).query)["code"]
+      post "/mcp/token", params: { grant_type: "authorization_code", code: code, code_verifier: "dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk", redirect_uri: "https://claude.ai/callback", client_id: @client.uid }
+      response.parsed_body["access_token"]
+    end
+
+    assert_equal [ Account.new("acme"), Account.new("globex") ], tokens.map { |token| HubKernel::Mcp::Connection.caller_for(token).account }
+  end
+
   private
 
   def refusal_reason = css_select(".ks-alert-message").text
+
+  def account_options = css_select("select[name=account] option").map { |option| [ option.text, option["value"] ] }
 
   def decision_form(decision) = css_select("form.ks-form").find { |form| form.at_css("input[name=decision]")&.[]("value") == decision }
 

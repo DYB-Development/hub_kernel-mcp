@@ -9,15 +9,17 @@ module HubKernel
 
       belongs_to :client
 
-      def self.issue(person:, client:, redirect_uri:, code_challenge:)
+      def self.issue(person:, client:, redirect_uri:, code_challenge:, account: nil)
         code = SecureRandom.urlsafe_base64(32)
-        create!(code_digest: digest(code), person_gid: person.to_global_id.to_s, client: client, redirect_uri: redirect_uri, code_challenge: code_challenge, expires_at: LIFETIME.from_now)
+        create!(code_digest: digest(code), person_gid: person.to_global_id.to_s, account_gid: account&.to_global_id&.to_s, client: client, redirect_uri: redirect_uri, code_challenge: code_challenge, expires_at: LIFETIME.from_now)
         code
       end
 
       def self.digest(code) = Digest::SHA256.hexdigest(code)
 
       def person = GlobalID::Locator.locate(person_gid)
+
+      def account = GlobalID::Locator.locate(account_gid)
 
       def verifies?(verifier)
         ActiveSupport::SecurityUtils.secure_compare(Base64.urlsafe_encode64(Digest::SHA256.digest(verifier.to_s), padding: false), code_challenge)
