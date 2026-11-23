@@ -104,6 +104,9 @@ then mount its discovery documents at the site root beside the endpoint:
 bin/rails hub_kernel_mcp:install:migrations db:migrate
 ```
 
+A host upgrading the gem runs the same command again to copy in the migrations it does not have
+yet.
+
 ```ruby
 mount HubKernel::Mcp::Engine => "/mcp"
 mount HubKernel::Mcp::Discovery => "/.well-known"
@@ -152,8 +155,22 @@ HubKernel::Mcp.browser_layout = "application"
 `HubKernel::Mcp.check!` names each of the four a host has not set. The person the page gives is
 kept by its global id, so it must be a record that has one.
 
+A host whose people belong to several accounts names the accounts a person may connect an app
+to, as a label and an account record for each:
+
+```ruby
+HubKernel::Mcp.approval_accounts = ->(person) { person.accounts.map { |account| [ account.name, account ] } }
+```
+
+The account must be a record that has a global id. When `approval_accounts` is not set, the
+approval page asks for no account and every connection is made with none.
+
 A person who is not signed in is sent through the host's sign-in. A signed-in person sees the
-name of the app asking to connect, with an Approve and a Deny button. Approving sends them back
+name of the app asking to connect, with an Approve and a Deny button. When the host names
+approval accounts, the page also lists the person's accounts and asks which one the app
+connects to. A person with one account finds it already picked. Approving with no account
+picked, or with an account that is not in the person's list, shows the page again with
+`Choose the account this app connects to` and issues no code. Approving sends them back
 to the client's redirect address with a code and the client's `state`. Denying sends them back
 with `error=access_denied` and no code. A request missing its `client_id` or `redirect_uri`,
 naming a client that is not registered, or naming a redirect address the client did not
@@ -215,6 +232,26 @@ end
 `HubKernel::Mcp::Connection.person_for` gives the person while the token is unexpired, and `nil`
 for an expired or unknown token. Every call is made in the account the host's account method
 gives, so that method must give one for a person signed in this way.
+
+`HubKernel::Mcp::Connection.caller_for` takes the same token and gives both the person and the
+account the person picked when they approved the app, so the host's account method can run the
+call in that account:
+
+```ruby
+def current_caller = authenticate_with_http_token { |token| HubKernel::Mcp::Connection.caller_for(token) }
+
+def current_person = current_caller&.person
+
+def current_account = current_caller&.account || default_account
+```
+
+It gives `nil` for an expired or unknown token, and both lookups record when the connection was
+last used. A connection made with no account, including every connection made before 0.11.0,
+gives `nil` as its account, and the host decides which account such a call runs in.
+
+Each approval makes its own connection, so connecting the same app to a second account adds a
+second connection beside the first. A refreshed access token stays in the account its
+connection was approved for.
 
 A person can see the apps connected as them and disconnect one. The gem ships a section for a
 host's settings page: the `hub_kernel/mcp/connections` partial, which lists each of the person's
