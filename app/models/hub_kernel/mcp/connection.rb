@@ -13,9 +13,9 @@ module HubKernel
 
       scope :of, ->(person) { where(person_gid: person.to_global_id.to_s) }
 
-      def self.issue(person:, client:, code_digest: nil)
+      def self.issue(person:, client:, code_digest: nil, account: nil)
         tokens = new_tokens
-        create!(person_gid: person.to_global_id.to_s, client: client, code_digest: code_digest, **digests_for(tokens))
+        create!(person_gid: person.to_global_id.to_s, account_gid: account&.to_global_id&.to_s, client: client, code_digest: code_digest, **digests_for(tokens))
         tokens
       end
 
@@ -45,6 +45,8 @@ module HubKernel
       private_class_method :new_tokens, :digests_for
 
       def person = GlobalID::Locator.locate(person_gid)
+
+      def account = GlobalID::Locator.locate(account_gid)
     end
   end
 end

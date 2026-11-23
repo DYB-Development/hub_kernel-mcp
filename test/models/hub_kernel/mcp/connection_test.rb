@@ -10,6 +10,12 @@ class HubKernel::Mcp::ConnectionTest < ActiveSupport::TestCase
     assert_equal [ Digest::SHA256.hexdigest(token), Person.new("sam"), @client ], [ stored.token_digest, stored.person, stored.client ]
   end
 
+  test "an issued connection holds the account it was approved for" do
+    HubKernel::Mcp::Connection.issue(person: Person.new("sam"), client: @client, account: Account.new("acme"))
+
+    assert_equal Account.new("acme"), HubKernel::Mcp::Connection.sole.account
+  end
+
   test "an unexpired access token gives the person it acts for" do
     token = HubKernel::Mcp::Connection.issue(person: Person.new("sam"), client: @client).access_token
 
