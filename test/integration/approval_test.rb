@@ -6,6 +6,8 @@ class ApprovalTest < ActionDispatch::IntegrationTest
     @approval = { response_type: "code", client_id: @client.uid, redirect_uri: "https://claude.ai/callback", state: "xyz", code_challenge: "E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM", code_challenge_method: "S256" }
   end
 
+  teardown { HubKernel::Mcp.approval_accounts = nil }
+
   test "a person who is not signed in is sent to the host's sign-in and returned to the approval page" do
     get "/mcp/authorize", params: @approval
     get response.location, params: { person: "sam" }
@@ -131,9 +133,20 @@ class ApprovalTest < ActionDispatch::IntegrationTest
     assert_equal "The app asking to connect is not registered", css_select(".ks-alert-error .ks-alert-message").text
   end
 
+  test "a person with several accounts is asked which of them the app connects to" do
+    HubKernel::Mcp.approval_accounts = ->(person) { [ [ "Acme for #{person.id}", Account.new("acme") ], [ "Globex for #{person.id}", Account.new("globex") ] ] }
+    sign_in "sam"
+
+    get "/mcp/authorize", params: @approval
+
+    assert_equal [ [ "Choose an account", "" ], [ "Acme for sam", Account.new("acme").to_global_id.to_s ], [ "Globex for sam", Account.new("globex").to_global_id.to_s ] ], account_options
+  end
+
   private
 
   def refusal_reason = css_select(".ks-alert-message").text
+
+  def account_options = css_select("select[name=account] option").map { |option| [ option.text, option["value"] ] }
 
   def decision_form(decision) = css_select("form.ks-form").find { |form| form.at_css("input[name=decision]")&.[]("value") == decision }
 

@@ -15,6 +15,7 @@ module HubKernel
     mattr_accessor :browser_person_method
     mattr_accessor :browser_layout
     mattr_accessor :registration_limit, default: 10
+    mattr_accessor :approval_accounts
 
     BROWSER_SETTINGS = %i[browser_controller sign_in_method browser_person_method browser_layout].freeze
 

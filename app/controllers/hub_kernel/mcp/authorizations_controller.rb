@@ -12,7 +12,7 @@ module HubKernel
       before_action :refuse_missing_values, :refuse_unknown_client, :refuse_unregistered_redirect
       before_action :refuse_without_pkce
 
-      helper_method :approval_params
+      helper_method :approval_params, :account_options
 
       def new
       end
@@ -64,6 +64,10 @@ module HubKernel
       end
 
       def approval_params = params.permit(*APPROVAL_PARAMS)
+
+      def account_options
+        HubKernel::Mcp.approval_accounts&.call(send(HubKernel::Mcp.browser_person_method))&.map { |label, account| [ label, account.to_global_id.to_s ] }
+      end
     end
   end
 end
