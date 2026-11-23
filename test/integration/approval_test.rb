@@ -142,6 +142,15 @@ class ApprovalTest < ActionDispatch::IntegrationTest
     assert_equal [ [ "Choose an account", "" ], [ "Acme for sam", Account.new("acme").to_global_id.to_s ], [ "Globex for sam", Account.new("globex").to_global_id.to_s ] ], account_options
   end
 
+  test "a person who approves with an account picked is issued a code for that account" do
+    HubKernel::Mcp.approval_accounts = ->(_person) { [ [ "Acme", Account.new("acme") ], [ "Globex", Account.new("globex") ] ] }
+    sign_in "sam"
+
+    post "/mcp/authorize", params: @approval.merge(decision: "approve", account: Account.new("globex").to_global_id.to_s)
+
+    assert_equal Account.new("globex"), HubKernel::Mcp::AuthorizationCode.sole.account
+  end
+
   private
 
   def refusal_reason = css_select(".ks-alert-message").text

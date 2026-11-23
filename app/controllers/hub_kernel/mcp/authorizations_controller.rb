@@ -20,7 +20,7 @@ module HubKernel
       def create
         return redirect_to_client(error: "access_denied") unless params[:decision] == "approve"
 
-        code = AuthorizationCode.issue(person: send(HubKernel::Mcp.browser_person_method), client: @client, redirect_uri: params[:redirect_uri], code_challenge: params[:code_challenge])
+        code = AuthorizationCode.issue(person: approving_person, account: picked_account, client: @client, redirect_uri: params[:redirect_uri], code_challenge: params[:code_challenge])
         redirect_to_client(code: code)
       end
 
@@ -65,9 +65,13 @@ module HubKernel
 
       def approval_params = params.permit(*APPROVAL_PARAMS)
 
-      def account_options
-        HubKernel::Mcp.approval_accounts&.call(send(HubKernel::Mcp.browser_person_method))&.map { |label, account| [ label, account.to_global_id.to_s ] }
-      end
+      def approving_person = send(HubKernel::Mcp.browser_person_method)
+
+      def approval_accounts = HubKernel::Mcp.approval_accounts&.call(approving_person)
+
+      def account_options = approval_accounts&.map { |label, account| [ label, account.to_global_id.to_s ] }
+
+      def picked_account = approval_accounts&.map(&:last)&.find { |account| account.to_global_id.to_s == params[:account] }
     end
   end
 end
