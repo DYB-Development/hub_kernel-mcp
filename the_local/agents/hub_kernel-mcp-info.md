@@ -1,8 +1,8 @@
 ---
 name: hub_kernel-mcp-info
-description: Use to learn what hub_kernel-mcp offers — serving a host's hubs as MCP tools, how tools are named and scoped, how a client such as Claude's connector screen finds the endpoint's sign-in, registers itself, is approved by a person through the browser, trades its code for an access token and a refresh token and later trades the refresh token for a new pair, how each sign-in step refuses a bad request or an unexpected error, how many clients one address may register in an hour, how the host's sign-in finds the person a token acts for, how a person sees and disconnects the apps connected as them, how expired sign-in records are removed, and the vocabulary the install and develop locals assume.
+description: Use to learn what hub_kernel-mcp offers — serving a host's hubs as MCP tools, how tools are named and scoped, how a client such as Claude's connector screen finds the endpoint's sign-in, registers itself, is approved by a person through the browser, who may pick the account it connects to, trades its code for an access token and a refresh token and later trades the refresh token for a new pair, how each sign-in step refuses a bad request or an unexpected error, how many clients one address may register in an hour, how the host's sign-in finds the person a token acts for and the account it was approved for, how a person sees and disconnects the apps connected as them, how expired sign-in records are removed, and the vocabulary the install and develop locals assume.
 tools: Read
-scope: hub MCP tools — serving the methods every hub a host serves, from hub_kernel-interface's one served list, as MCP tools at one JSON-RPC endpoint in a host Rails app, each call behind the host's own sign-in and hub_kernel-interface's permission check and account scope, with a boot check for hubs that cannot be served as tools, the OAuth discovery documents, 401 challenge and client registration that let a client such as Claude's connector screen find the endpoint's sign-in and register by itself, with each client recording the address it registered from and a configurable limit on how many clients one address may register per hour past which registration is refused, and the approval page where a person signed in to the host through the browser approves that client and is issued an authorization code, the token exchange that trades that code with its PKCE verifier for an access token lasting an hour and a refresh token, the refresh exchange that trades a refresh token for a new access token and a new refresh token and retires the one posted, and the lookup a host's sign-in calls to get the person a bearer token acts for, which records when the connection was last used, and the settings section a host registers with settings_hub that lists a person's connections with the app's name, when it connected and when it was last used, and disconnects one that is the person's own, and the prune task a host schedules with its own job runner that removes expired authorization codes, connections whose access and refresh tokens have both expired, and clients over a day old with no connection
+scope: hub MCP tools — serving the methods every hub a host serves, from hub_kernel-interface's one served list, as MCP tools at one JSON-RPC endpoint in a host Rails app, each call behind the host's own sign-in and hub_kernel-interface's permission check and account scope, with a boot check for hubs that cannot be served as tools, the OAuth discovery documents, 401 challenge and client registration that let a client such as Claude's connector screen find the endpoint's sign-in and register by itself, with each client recording the address it registered from and a configurable limit on how many clients one address may register per hour past which registration is refused, and the approval page where a person signed in to the host through the browser approves that client, picks the account it connects to when the host names the person's accounts, and is issued an authorization code, the token exchange that trades that code with its PKCE verifier for an access token lasting an hour and a refresh token, the refresh exchange that trades a refresh token for a new access token and a new refresh token and retires the one posted, and the lookups a host's sign-in calls to get the person a bearer token acts for, or that person and the account picked on the approval page, each recording when the connection was last used, and the settings section a host registers with settings_hub that lists a person's connections with the app's name, when it connected and when it was last used, and disconnects one that is the person's own, and the prune task a host schedules with its own job runner that removes expired authorization codes, connections whose access and refresh tokens have both expired, and clients over a day old with no connection
 ---
 
 This local explains hub_kernel-mcp and makes no changes.
@@ -28,13 +28,14 @@ refused request tells the client where the endpoint is described, two discovery
 documents name the endpoint's sign-in and its registration address, and the
 client registers itself there with its name and redirect addresses. The client
 then sends the person to an approval page in the host, where they sign in
-through the host's usual browser sign-in and approve or deny the client. An
-approval gives the client an authorization code, which it trades at the token
+through the host's usual browser sign-in and approve or deny the client. When
+the host names the accounts a person belongs to, the page also asks which
+account the app connects to. An approval gives the client an authorization code, which it trades at the token
 address for an access token lasting an hour and a refresh token. When the
 access token runs out, the client trades the refresh token at the same address
 for a new pair, so the person does not approve the client again. The client
 sends the access token on every request, and the host's sign-in asks the gem
-which person the token acts for. A person using Claude's connector screen only
+which person the token acts for, and which account the person picked for it. A person using Claude's connector screen only
 pastes the endpoint's address.
 
 A person can see which apps are connected as them, and cut one off. The gem
@@ -57,8 +58,9 @@ This local declares no entry points of its own.
 - Adding the gem to a host, mounting the endpoint and the discovery documents,
   installing the client, authorization code and connection tables, configuring
   which controllers, person, account and sign-in methods and layout it uses,
-  setting the registration limit, running the boot check, calling the token
-  lookup from the host's sign-in, registering the connections section and its
+  setting the registration limit, naming the accounts the approval page
+  offers, running the boot check, calling the token lookups from the host's
+  sign-in, registering the connections section and its
   disconnect action with settings_hub, and scheduling the prune task are owned
   by the install local, `hub_kernel-mcp-install`.
 - The endpoint itself, the MCP requests it answers, the discovery documents,
@@ -71,7 +73,8 @@ This local declares no entry points of its own.
 
 - To put hub_kernel-mcp into a Rails app, to let a connector screen sign in to
   it, to point the approval page at the host's browser sign-in and layout, to
-  make the host's sign-in accept the access tokens this gem issues, to add the
+  make the host's sign-in accept the access tokens this gem issues, to let a
+  person pick the account an app connects to and run each call in it, to add the
   connected apps section to the host's settings page, to raise or lower how
   many clients one address may register in an hour, to schedule the removal of
   expired sign-in records, or to fix a host whose boot check fails, use
@@ -137,10 +140,16 @@ This local declares no entry points of its own.
   and nothing is sent to any address. A request without a SHA-256 PKCE
   challenge is sent back to the client as an invalid request. A denial is sent
   back to the client as access denied.
+- **Account choice** — when the host names the accounts a person may connect
+  an app to, as a label and an account record for each, the approval page
+  lists them and asks which one the app connects to. A person with one account
+  finds it already picked. Approving with no account picked, or one not in the
+  list, shows the page again with `Choose the account this app connects to` and
+  issues no code. When the host names no accounts, the page asks for none.
 - **Authorization code** — what an approval sends back to the client's redirect
   address, along with the client's state. It is tied to the person, the client,
-  the redirect address and the PKCE challenge, lasts ten minutes, and only a
-  digest of it is stored.
+  the redirect address, the PKCE challenge and the account picked, if any,
+  lasts ten minutes, and only a digest of it is stored.
 - **Token exchange** — the client posts its client id, its code, its redirect
   address and its PKCE verifier to the token address, with no sign-in. A code
   that is unknown, expired, already traded, issued to another client, sent with
@@ -151,12 +160,17 @@ This local declares no entry points of its own.
   body that cannot be read is refused as an invalid request.
 - **Access token, refresh token and connection** — what a traded code is
   answered with: a bearer access token that lasts an hour and a refresh token
-  that lasts ninety days. The pair is stored as a connection tying the person
-  and the client to a digest of each token, so neither token itself is stored.
+  that lasts ninety days. The pair is stored as a connection tying the person,
+  the client and the account picked on the approval page to a digest of each
+  token, so neither token itself is stored. A connection keeps the account by
+  its global id, and one made with no account, including every one made before
+  the account was kept, has none. Each approval makes its own connection, so
+  connecting the same app to a second account makes a second connection.
 - **Refresh exchange** — the client posts its client id and its refresh token to
   the token address, asking for the refresh grant, with no sign-in. It is
   answered with a new access token and a new refresh token on the same
-  connection, and the new refresh token lasts another ninety days. The refresh
+  connection, so the new access token keeps the connection's account, and the
+  new refresh token lasts another ninety days. The refresh
   token posted and the access token it was issued with both stop working. A
   refresh token that is unknown, already used, issued to another client, or
   unused for ninety days is refused as an invalid grant, and of two refreshes
@@ -166,12 +180,13 @@ This local declares no entry points of its own.
   with status 500 and a server error. On the approval page it shows the error
   page instead. Either way its message is never sent to the client or shown to
   the person, and it is reported to the host's error reporting.
-- **Token lookup** — what the host's sign-in calls with the bearer token from a
-  request. It gives the person the access token acts for while the token is
-  unexpired, and nothing for an expired, replaced or unknown token. Each lookup
-  that finds a person records the time on the connection as when it was last
-  used. The account a call is made in still comes from the host's account
-  method.
+- **Token lookups** — what the host's sign-in calls with the bearer token from
+  a request. One gives the person the access token acts for. The other gives
+  that person together with the account picked on the approval page, or no
+  account for a connection made with none. Both give nothing for an expired,
+  replaced or unknown token, and each lookup that finds a connection records the
+  time on it as when it was last used. The account a call is made in still
+  comes from the host's account method, which may return the looked-up account.
 - **Connections section** — the part of a host's settings page that lists the
   signed-in person's connections, oldest first, each with the app's name, when
   it connected, and when it was last used or that it was never used. It is

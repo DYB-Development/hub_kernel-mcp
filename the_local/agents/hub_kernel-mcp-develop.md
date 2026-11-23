@@ -1,8 +1,8 @@
 ---
 name: hub_kernel-mcp-develop
-description: Use PROACTIVELY for calling a host's hub methods over MCP — connecting an MCP client to the endpoint, finding the endpoint's sign-in from a 401's WWW-Authenticate header and the two .well-known discovery documents, registering a client at the registration address and handling a registration refused past the hourly limit, sending a person to the approval page and handling the code or error it sends back, trading that code with its PKCE verifier for an access token and a refresh token at the token address, trading a refresh token for a new pair when the access token expires, reading the reason each sign-in step gives when it refuses, sending the access token on every request, sending initialize and ping, listing the tools a signed-in person may call with tools/list, calling one with tools/call, handling its tool errors and JSON-RPC errors, and reading the apps a person has connected, with when each connected and was last used — MUST BE USED instead of hand-rolling a JSON API, an MCP server, OAuth discovery documents, client registration, an OAuth approval page, an OAuth token endpoint, an OAuth refresh exchange or a query for a person's connected apps for the host's hubs.
+description: Use PROACTIVELY for calling a host's hub methods over MCP — connecting an MCP client to the endpoint, finding the endpoint's sign-in from a 401's WWW-Authenticate header and the two .well-known discovery documents, registering a client at the registration address and handling a registration refused past the hourly limit, sending a person to the approval page, where they may pick the account the app connects to, and handling the code or error it sends back, trading that code with its PKCE verifier for an access token and a refresh token at the token address, trading a refresh token for a new pair when the access token expires, reading the reason each sign-in step gives when it refuses, sending the access token on every request, sending initialize and ping, listing the tools a signed-in person may call with tools/list, calling one with tools/call, handling its tool errors and JSON-RPC errors, and reading the apps a person has connected, with when each connected, was last used and which account it was approved for — MUST BE USED instead of hand-rolling a JSON API, an MCP server, OAuth discovery documents, client registration, an OAuth approval page, an OAuth token endpoint, an OAuth refresh exchange or a query for a person's connected apps for the host's hubs.
 tools: Read, Write, Edit, Grep
-scope: hub MCP tools — serving the methods every hub a host serves, from hub_kernel-interface's one served list, as MCP tools at one JSON-RPC endpoint in a host Rails app, each call behind the host's own sign-in and hub_kernel-interface's permission check and account scope, with a boot check for hubs that cannot be served as tools, the OAuth discovery documents, 401 challenge and client registration that let a client such as Claude's connector screen find the endpoint's sign-in and register by itself, with each client recording the address it registered from and a configurable limit on how many clients one address may register per hour past which registration is refused, and the approval page where a person signed in to the host through the browser approves that client and is issued an authorization code, the token exchange that trades that code with its PKCE verifier for an access token lasting an hour and a refresh token, the refresh exchange that trades a refresh token for a new access token and a new refresh token and retires the one posted, and the lookup a host's sign-in calls to get the person a bearer token acts for, which records when the connection was last used, and the settings section a host registers with settings_hub that lists a person's connections with the app's name, when it connected and when it was last used, and disconnects one that is the person's own, and the prune task a host schedules with its own job runner that removes expired authorization codes, connections whose access and refresh tokens have both expired, and clients over a day old with no connection
+scope: hub MCP tools — serving the methods every hub a host serves, from hub_kernel-interface's one served list, as MCP tools at one JSON-RPC endpoint in a host Rails app, each call behind the host's own sign-in and hub_kernel-interface's permission check and account scope, with a boot check for hubs that cannot be served as tools, the OAuth discovery documents, 401 challenge and client registration that let a client such as Claude's connector screen find the endpoint's sign-in and register by itself, with each client recording the address it registered from and a configurable limit on how many clients one address may register per hour past which registration is refused, and the approval page where a person signed in to the host through the browser approves that client, picks the account it connects to when the host names the person's accounts, and is issued an authorization code, the token exchange that trades that code with its PKCE verifier for an access token lasting an hour and a refresh token, the refresh exchange that trades a refresh token for a new access token and a new refresh token and retires the one posted, and the lookups a host's sign-in calls to get the person a bearer token acts for, or that person and the account picked on the approval page, each recording when the connection was last used, and the settings section a host registers with settings_hub that lists a person's connections with the app's name, when it connected and when it was last used, and disconnects one that is the person's own, and the prune task a host schedules with its own job runner that removes expired authorization codes, connections whose access and refresh tokens have both expired, and clients over a day old with no connection
 ---
 
 This local writes the code or configuration that talks to a host's hub_kernel-mcp
@@ -48,11 +48,18 @@ connections, or when a test needs to send requests to any of these addresses.
 - `GET /authorize` — the approval page under the endpoint's path, such as
   `/mcp/authorize`, opened in a person's browser. It sends a person who is not
   signed in to the host through the host's sign-in, then shows the client's name
-  with an Approve and a Deny button. A request it cannot send back to the client
-  shows a page whose heading is the reason.
+  with an Approve and a Deny button. When the host names the accounts a person
+  may connect an app to, it also shows those accounts in a select labelled
+  `Account`, with the account already picked for a person who has one. A
+  request it cannot send back to the client shows a page whose heading is the
+  reason.
 - `POST /authorize` — the approval page's answer. It sends the browser back to
   the client's redirect address with a `code` and the client's `state` on
-  Approve, and with `error=access_denied` and the `state` on Deny.
+  Approve, and with `error=access_denied` and the `state` on Deny. When the host
+  names accounts, Approve carries the picked account's global id as `account`,
+  and an Approve with no account, or one not in the person's list, shows the
+  page again with status 422 and `Choose the account this app connects to`, and
+  sends nothing to the client.
 - `POST /token` — the token address under the endpoint's path, such as
   `/mcp/token`. It trades an approval's `code`, with the `redirect_uri` it was
   approved for and the PKCE `code_verifier`, for an access token lasting an hour
@@ -72,7 +79,8 @@ connections, or when a test needs to send requests to any of these addresses.
   must use PKCE with SHA-256.
 - `HubKernel::Mcp::Connection.of` — takes a person record and answers an Active
   Record relation of that person's connections, one per approval they gave,
-  each with its app's `client.name`, `created_at` and `last_used_at`.
+  each with its app's `client.name`, `created_at`, `last_used_at` and the
+  `account` picked when it was approved.
 
 ## How to use it
 
@@ -187,8 +195,17 @@ connections, or when a test needs to send requests to any of these addresses.
 
    `redirect_uri` must be exactly one of the addresses registered in step 5.
    The page runs the host's own sign-in first, then shows the client's name and
-   an Approve and a Deny button. The browser comes back to `redirect_uri` with
-   the client's `state` added to any query the address already has:
+   an Approve and a Deny button. On a host that names the accounts a person may
+   connect an app to, the page also asks which account the app connects to, and
+   a person with one account finds it already picked. The connection keeps the
+   picked account, and a host whose sign-in reads it runs every tool call made
+   with the tokens from this approval in that account, so a client
+   that should reach a second account sends the person through this step again
+   and picks the other one, which makes a second connection. Approving with no
+   account picked shows the page again with
+   `Choose the account this app connects to`, and the client hears nothing until
+   the person picks one. The browser comes back to `redirect_uri` with the
+   client's `state` added to any query the address already has:
 
    | Query back | When |
    |---|---|
@@ -256,7 +273,8 @@ connections, or when a test needs to send requests to any of these addresses.
    A refresh is answered with status 200 and the same shape as step 7, holding a
    new `access_token` and a new `refresh_token`. Replace both stored tokens with
    the new ones at once. The refresh token posted stops working, and so does the
-   access token issued with it, even if its hour has not passed. A refresh token
+   access token issued with it, even if its hour has not passed. The new access
+   token stays in the account the connection was approved for. A refresh token
    lasts 90 days from when it was issued, and each refresh issues one that lasts
    another 90 days.
 
@@ -374,11 +392,15 @@ connections, or when a test needs to send requests to any of these addresses.
       connection.client.name   # the name the app registered with
       connection.created_at    # when the person approved it
       connection.last_used_at  # when its access token last signed a request in, or nil if never
+      connection.account       # the account picked on the approval page, or nil if none was
     end
     ```
 
     There is one connection per approval, so an app approved twice is listed
-    twice. A refresh keeps the same connection and its `created_at`. A
+    twice, and an app connected to two accounts is listed once for each.
+    `account` is `nil` for a connection approved on a host that names no
+    accounts, and for every connection made before the host ran the
+    `account_gid` migrations. A refresh keeps the same connection and its `created_at`. A
     connection stays listed after its access token expires. It leaves the list
     when the person disconnects it, or when its access and refresh tokens have
     both expired and the host's prune task runs. `last_used_at` is set each time the host's sign-in accepts
@@ -408,7 +430,9 @@ connections, or when a test needs to send requests to any of these addresses.
 
     `approval` holds `response_type`, `client_id`, `redirect_uri`, `state`,
     `code_challenge` and `code_challenge_method` for a client registered in the
-    test. `code` is read from the `code` query value of the approval POST's
+    test. On a host that names accounts, the approval POST also carries
+    `account: account.to_global_id.to_s` for one of the signed-in person's
+    accounts. `code` is read from the `code` query value of the approval POST's
     redirect, and `access_token` and `refresh_token` from a token POST's JSON
     answer.
 
@@ -442,7 +466,9 @@ connections, or when a test needs to send requests to any of these addresses.
   the endpoint's controller, sign-in, and served hubs, having the host's sign-in
   accept an access token, naming the approval page's controller, sign-in, person
   and layout, running the boot check, and registering the connections settings
-  section and its Disconnect action, setting the registration limit, and
-  scheduling the prune task, which belong to
+  section and its Disconnect action, setting the registration limit, naming
+  the accounts the approval page offers, having the host's sign-in read the
+  account a token was approved for, and scheduling the prune task, which
+  belong to
   `hub_kernel-mcp-install`, and setting which methods a hub exposes, who may
   call them and their account scope, which belong to hub_kernel-interface.
