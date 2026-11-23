@@ -12,7 +12,7 @@ module HubKernel
       before_action :refuse_missing_values, :refuse_unknown_client, :refuse_unregistered_redirect
       before_action :refuse_without_pkce
 
-      helper_method :approval_params, :account_options
+      helper_method :approval_params, :account_options, :preselected_account
 
       def new
       end
@@ -76,6 +76,8 @@ module HubKernel
       def approval_accounts = HubKernel::Mcp.approval_accounts&.call(approving_person)
 
       def account_options = approval_accounts&.map { |label, account| [ label, account.to_global_id.to_s ] }
+
+      def preselected_account = (account_options.sole.last if account_options.one?)
 
       def picked_account = approval_accounts&.map(&:last)&.find { |account| account.to_global_id.to_s == params[:account] }
     end

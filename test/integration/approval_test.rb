@@ -163,6 +163,15 @@ class ApprovalTest < ActionDispatch::IntegrationTest
     assert_equal [ [ [ 422, "Choose the account this app connects to" ] ] * 2, 0 ], [ pages, HubKernel::Mcp::AuthorizationCode.count ]
   end
 
+  test "a person with one account finds it already picked" do
+    HubKernel::Mcp.approval_accounts = ->(_person) { [ [ "Acme", Account.new("acme") ] ] }
+    sign_in "sam"
+
+    get "/mcp/authorize", params: @approval
+
+    assert_equal [ "Acme" ], css_select("select[name=account] option[selected]").map(&:text)
+  end
+
   private
 
   def refusal_reason = css_select(".ks-alert-message").text

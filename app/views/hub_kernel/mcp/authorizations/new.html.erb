@@ -6,7 +6,7 @@
   <% end %>
   <%= hidden_field_tag :decision, "approve" %>
   <% if account_options %>
-    <%= ui_form_field(attribute: :account, label: "Account", type: :select, options: account_options, include_blank: "Choose an account", errors: Array(@account_error)) %>
+    <%= ui_form_field(attribute: :account, label: "Account", type: :select, options: account_options, value: preselected_account, include_blank: "Choose an account", errors: Array(@account_error)) %>
   <% end %>
   <%= ui_button(label: "Approve") %>
 <% end %>
