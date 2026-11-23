@@ -182,6 +182,20 @@ class ApprovalTest < ActionDispatch::IntegrationTest
     assert_equal [ 0, nil ], [ fields, HubKernel::Mcp::AuthorizationCode.sole.account ]
   end
 
+  test "connecting the same app to a second account makes a second connection beside the first" do
+    HubKernel::Mcp.approval_accounts = ->(_person) { [ [ "Acme", Account.new("acme") ], [ "Globex", Account.new("globex") ] ] }
+    sign_in "sam"
+
+    tokens = %w[acme globex].map do |id|
+      post "/mcp/authorize", params: @approval.merge(decision: "approve", account: Account.new(id).to_global_id.to_s)
+      code = Rack::Utils.parse_query(URI(response.location).query)["code"]
+      post "/mcp/token", params: { grant_type: "authorization_code", code: code, code_verifier: "dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk", redirect_uri: "https://claude.ai/callback", client_id: @client.uid }
+      response.parsed_body["access_token"]
+    end
+
+    assert_equal [ Account.new("acme"), Account.new("globex") ], tokens.map { |token| HubKernel::Mcp::Connection.caller_for(token).account }
+  end
+
   private
 
   def refusal_reason = css_select(".ks-alert-message").text
