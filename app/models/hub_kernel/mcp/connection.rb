@@ -8,6 +8,7 @@ module HubKernel
       REFRESH_LIFETIME = 90.days
 
       Tokens = Data.define(:access_token, :refresh_token)
+      Caller = Data.define(:person, :account)
 
       belongs_to :client
 
@@ -28,11 +29,13 @@ module HubKernel
         tokens if renewed == 1
       end
 
-      def self.person_for(token)
+      def self.caller_for(token)
         connection = where(expires_at: Time.current..).find_by(token_digest: digest(token.to_s))
         connection&.touch(:last_used_at)
-        connection&.person
+        connection && Caller.new(person: connection.person, account: connection.account)
       end
+
+      def self.person_for(token) = caller_for(token)&.person
 
       def self.digest(token) = Digest::SHA256.hexdigest(token)
 

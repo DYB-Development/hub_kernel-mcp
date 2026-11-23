@@ -22,6 +22,14 @@ class HubKernel::Mcp::ConnectionTest < ActiveSupport::TestCase
     assert_equal Person.new("sam"), HubKernel::Mcp::Connection.person_for(token)
   end
 
+  test "an unexpired access token gives the person it acts for and the account it acts in" do
+    token = HubKernel::Mcp::Connection.issue(person: Person.new("sam"), client: @client, account: Account.new("acme")).access_token
+
+    caller = HubKernel::Mcp::Connection.caller_for(token)
+
+    assert_equal [ Person.new("sam"), Account.new("acme") ], [ caller.person, caller.account ]
+  end
+
   test "an expired access token gives no person" do
     token = HubKernel::Mcp::Connection.issue(person: Person.new("sam"), client: @client).access_token
     travel 1.hour + 1.second
