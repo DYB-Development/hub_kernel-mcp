@@ -59,6 +59,14 @@ class HubKernel::Mcp::ConnectionTest < ActiveSupport::TestCase
     assert_equal [ Person.new("sam"), nil ], [ HubKernel::Mcp::Connection.person_for(renewed.access_token), HubKernel::Mcp::Connection.refresh(tokens.refresh_token, client: @client) ]
   end
 
+  test "a renewed access token acts in the account the connection was approved for" do
+    tokens = HubKernel::Mcp::Connection.issue(person: Person.new("sam"), client: @client, account: Account.new("acme"))
+
+    renewed = HubKernel::Mcp::Connection.refresh(tokens.refresh_token, client: @client)
+
+    assert_equal Account.new("acme"), HubKernel::Mcp::Connection.caller_for(renewed.access_token).account
+  end
+
   test "a refresh token posted by another client gives nothing" do
     tokens = HubKernel::Mcp::Connection.issue(person: Person.new("sam"), client: @client)
     other = HubKernel::Mcp::Client.create!(name: "Other", redirect_uris: [ "https://claude.ai/callback" ])
