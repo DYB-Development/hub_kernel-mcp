@@ -172,6 +172,16 @@ class ApprovalTest < ActionDispatch::IntegrationTest
     assert_equal [ "Acme" ], css_select("select[name=account] option[selected]").map(&:text)
   end
 
+  test "a host that sets no approval accounts is asked for no account and is issued a code with none" do
+    sign_in "sam"
+
+    get "/mcp/authorize", params: @approval
+    fields = css_select("select[name=account]").size
+    post "/mcp/authorize", params: @approval.merge(decision: "approve")
+
+    assert_equal [ 0, nil ], [ fields, HubKernel::Mcp::AuthorizationCode.sole.account ]
+  end
+
   private
 
   def refusal_reason = css_select(".ks-alert-message").text
