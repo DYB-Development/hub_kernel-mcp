@@ -10,6 +10,14 @@ class HubKernel::Mcp::AuthorizationCodeTest < ActiveSupport::TestCase
     assert_equal [ Digest::SHA256.hexdigest(code), Person.new("sam"), client ], [ stored.code_digest, stored.person, stored.client ]
   end
 
+  test "an issued code holds the account the person approved the client for" do
+    client = HubKernel::Mcp::Client.create!(name: "Claude", redirect_uris: [ "https://claude.ai/callback" ])
+
+    HubKernel::Mcp::AuthorizationCode.issue(person: Person.new("sam"), client: client, redirect_uri: "https://claude.ai/callback", code_challenge: "challenge", account: Account.new("acme"))
+
+    assert_equal Account.new("acme"), HubKernel::Mcp::AuthorizationCode.sole.account
+  end
+
   test "a code accepts only the PKCE verifier whose SHA-256 matches its challenge" do
     code = HubKernel::Mcp::AuthorizationCode.new(code_challenge: "E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM")
 
