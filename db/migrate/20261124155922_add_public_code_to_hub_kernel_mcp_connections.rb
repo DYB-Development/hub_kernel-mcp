@@ -14,7 +14,5 @@ class AddPublicCodeToHubKernelMcpConnections < ActiveRecord::Migration[8.1]
         end
       end
     end
-
-    add_index :hub_kernel_mcp_connections, :public_code, unique: true
   end
 end
