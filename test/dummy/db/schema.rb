@@ -51,6 +51,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_11_24_155922) do
     t.string "public_code"
     t.index ["client_id"], name: "index_hub_kernel_mcp_connections_on_client_id"
     t.index ["code_digest"], name: "index_hub_kernel_mcp_connections_on_code_digest"
+    t.index ["public_code"], name: "index_hub_kernel_mcp_connections_on_public_code", unique: true
     t.index ["refresh_token_digest"], name: "index_hub_kernel_mcp_connections_on_refresh_token_digest", unique: true
     t.index ["token_digest"], name: "index_hub_kernel_mcp_connections_on_token_digest", unique: true
   end
