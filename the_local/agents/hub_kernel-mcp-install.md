@@ -31,7 +31,7 @@ a signed-in person's behalf.
 - `mount HubKernel::Mcp::Discovery` — mounts the two OAuth discovery documents
   in the host's `config/routes.rb`. It must be mounted at `"/.well-known"`,
   since the endpoint's 401 header names that path.
-- `bin/rails hub_kernel_mcp:install:migrations` — copies the gem's nine
+- `bin/rails hub_kernel_mcp:install:migrations` — copies the gem's ten
   migrations into the host's `db/migrate`. They create the
   `hub_kernel_mcp_clients` table, which holds each client that registers, the
   `hub_kernel_mcp_authorization_codes` table, which holds each code the
@@ -42,6 +42,8 @@ a signed-in person's behalf.
   `created_at`, to `hub_kernel_mcp_clients`, and a nullable `account_gid`
   column, which holds the global id of the account picked on the approval page,
   to both `hub_kernel_mcp_authorization_codes` and `hub_kernel_mcp_connections`.
+  The last adds a `public_code` column with a unique index to
+  `hub_kernel_mcp_connections` and gives every connection already there a code.
 - `HubKernel::Mcp.base_controller=` — the name, as a String, of the host
   controller the endpoint inherits from. Its before-actions, including sign-in,
   run before any hub is asked. Defaults to `"ActionController::API"`, which has
@@ -216,9 +218,9 @@ a signed-in person's behalf.
    bin/rails hub_kernel_mcp:install:migrations db:migrate
    ```
 
-   This adds nine migrations to the host's `db/migrate` and the
+   This adds ten migrations to the host's `db/migrate` and the
    `hub_kernel_mcp_clients`, `hub_kernel_mcp_authorization_codes` and
-   `hub_kernel_mcp_connections` tables to `db/schema.rb`. Commit all ten
+   `hub_kernel_mcp_connections` tables to `db/schema.rb`. Commit all eleven
    files.
 
 10. Add the discovery mount to `config/routes.rb`, at the site root beside the
@@ -405,8 +407,9 @@ a signed-in person's behalf.
   should answer 401.
 - Run `bin/rails hub_kernel_mcp:install:migrations db:migrate` again after
   upgrading the gem. It copies only migrations the host does not have yet. A
-  host that installed an earlier version with fewer than nine migrations gets
-  the missing ones this way, including the two that add `account_gid`. Until
+  host that installed an earlier version with fewer than ten migrations gets
+  the missing ones this way, including the two that add `account_gid` and the
+  one that adds `public_code` and gives every existing connection a code. Until
   they are run, the registration address or the token address answers status
   500 with `server_error`, the approval page says
   `Signing in failed unexpectedly`, or the token lookups and the connections

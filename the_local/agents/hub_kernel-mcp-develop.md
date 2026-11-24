@@ -393,6 +393,7 @@ connections, or when a test needs to send requests to any of these addresses.
       connection.created_at    # when the person approved it
       connection.last_used_at  # when its access token last signed a request in, or nil if never
       connection.account       # the account picked on the approval page, or nil if none was
+      connection.public_code   # a random code, unique to the connection, for addressing it without its id
     end
     ```
 
@@ -405,7 +406,11 @@ connections, or when a test needs to send requests to any of these addresses.
     when the person disconnects it, or when its access and refresh tokens have
     both expired and the host's prune task runs. `last_used_at` is set each time the host's sign-in accepts
     the connection's access token. Ask the developer whether a list they build
-    should show expired connections. To show the list on a settings page with
+    should show expired connections. Address a host page for one connection by
+    its `public_code`, found with `find_by!(public_code:)` on the person's
+    relation, never by its `id`. Every connection has one from the moment it is
+    made, and the `public_code` migration gives one to every connection made
+    before it ran. To show the list on a settings page with
     Disconnect buttons, use the settings section `hub_kernel-mcp-install` covers
     instead of building one.
 

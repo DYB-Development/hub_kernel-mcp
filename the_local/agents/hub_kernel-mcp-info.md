@@ -165,7 +165,9 @@ This local declares no entry points of its own.
   token, so neither token itself is stored. A connection keeps the account by
   its global id, and one made with no account, including every one made before
   the account was kept, has none. Each approval makes its own connection, so
-  connecting the same app to a second account makes a second connection.
+  connecting the same app to a second account makes a second connection. Each
+  connection also carries a public code, a random code no other connection
+  shares, so a host can address a page for it without its database id.
 - **Refresh exchange** — the client posts its client id and its refresh token to
   the token address, asking for the refresh grant, with no sign-in. It is
   answered with a new access token and a new refresh token on the same
