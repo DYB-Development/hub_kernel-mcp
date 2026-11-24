@@ -2,6 +2,13 @@
 
 ## [Unreleased]
 
+## [0.12.1] - 2026-11-24
+
+### Fixed
+- The unique index on `public_code` is now added concurrently in a migration of its own, so a host running strong_migrations accepts it, installed with `bin/rails hub_kernel_mcp:install:migrations`.
+- The 0.12.0 migration now only adds the `public_code` column and gives every existing connection a code.
+- A host that already ran the 0.12.0 migration, and so already has the index, can run the new migration safely.
+
 ## [0.12.0] - 2026-11-24
 
 ### Added
