@@ -16,6 +16,12 @@ class HubKernel::Mcp::ConnectionTest < ActiveSupport::TestCase
     assert_equal Account.new("acme"), HubKernel::Mcp::Connection.sole.account
   end
 
+  test "an issued connection carries a public code" do
+    HubKernel::Mcp::Connection.issue(person: Person.new("sam"), client: @client)
+
+    assert_predicate HubKernel::Mcp::Connection.sole.public_code, :present?
+  end
+
   test "an unexpired access token gives the person it acts for" do
     token = HubKernel::Mcp::Connection.issue(person: Person.new("sam"), client: @client).access_token
 
