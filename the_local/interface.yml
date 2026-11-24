@@ -55,6 +55,7 @@ sources:
   - db/migrate/20261009000004_add_registered_from_to_hub_kernel_mcp_clients.rb
   - db/migrate/20261123175537_add_account_gid_to_hub_kernel_mcp_connections.rb
   - db/migrate/20261123175631_add_account_gid_to_hub_kernel_mcp_authorization_codes.rb
+  - db/migrate/20261124155922_add_public_code_to_hub_kernel_mcp_connections.rb
   - app/models/hub_kernel/mcp/client.rb
   - app/models/hub_kernel/mcp/authorization_code.rb
   - app/models/hub_kernel/mcp/connection.rb

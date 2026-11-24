@@ -10,6 +10,8 @@ module HubKernel
       Tokens = Data.define(:access_token, :refresh_token)
       Caller = Data.define(:person, :account)
 
+      has_secure_token :public_code
+
       belongs_to :client
 
       scope :of, ->(person) { where(person_gid: person.to_global_id.to_s) }

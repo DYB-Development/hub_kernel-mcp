@@ -2,6 +2,13 @@
 
 ## [Unreleased]
 
+## [0.12.0] - 2026-11-24
+
+### Added
+- Each connection carries a `public_code`, a random code given when the connection is made, so a host can address a page for one connection without its database id.
+- No two connections share a public code.
+- A migration adds the public code with a unique index and gives every existing connection a code, installed with `bin/rails hub_kernel_mcp:install:migrations`.
+
 ## [0.11.0] - 2026-11-23
 
 ### Added

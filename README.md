@@ -253,6 +253,11 @@ Each approval makes its own connection, so connecting the same app to a second a
 second connection beside the first. A refreshed access token stays in the account its
 connection was approved for.
 
+Each connection carries a `public_code`, a random code given when the connection is made, so a
+host can address a page for one connection without its database id. No two connections share a
+code. Installing the 0.12.0 migration with `bin/rails hub_kernel_mcp:install:migrations` gives
+every connection made before it a code.
+
 A person can see the apps connected as them and disconnect one. The gem ships a section for a
 host's settings page: the `hub_kernel/mcp/connections` partial, which lists each of the person's
 connections with the app's name, when it connected and when it was last used, and the
