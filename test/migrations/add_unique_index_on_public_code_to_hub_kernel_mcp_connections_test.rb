@@ -16,4 +16,8 @@ class AddUniqueIndexOnPublicCodeToHubKernelMcpConnectionsTest < ActiveSupport::T
 
     assert_raises(ActiveRecord::RecordNotUnique) { second.update_columns(public_code: first.public_code) }
   end
+
+  test "installing the index migration on a host that already has the index from 0.12.0 runs" do
+    assert_nothing_raised { @migration.migrate(:up) }
+  end
 end
